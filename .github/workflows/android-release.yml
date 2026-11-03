@@ -50,16 +50,36 @@ jobs:
           echo "TAG_NAME=v$VERSION_NAME" >> $GITHUB_ENV
           echo "Extracted Version: $VERSION_NAME (Build $VERSION_CODE)"
 
-      - name: Decode Keystore from Secret
+      - name: Prepare Signing Keystore
+        id: prepare_keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > "${{ github.workspace }}/release.jks"
+          KEYSTORE_FILE="${{ github.workspace }}/release.jks"
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "Using repository secret KEYSTORE_BASE64..."
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > "$KEYSTORE_FILE"
+            echo "STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
+          elif [ -f "${{ github.workspace }}/my-upload-key.jks" ]; then
+            echo "Using existing repository my-upload-key.jks..."
+            KEYSTORE_FILE="${{ github.workspace }}/my-upload-key.jks"
+            echo "STORE_PASSWORD=android" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=android" >> $GITHUB_ENV
+          else
+            echo "Generating automatic production signing key..."
+            keytool -genkeypair -v -keystore "$KEYSTORE_FILE" -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=ShopyPelse, OU=Mobile, O=ShopyPelse, L=Algiers, ST=Algiers, C=DZ"
+            echo "STORE_PASSWORD=android" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=android" >> $GITHUB_ENV
+          fi
+          echo "KEYSTORE_PATH=$KEYSTORE_FILE" >> $GITHUB_ENV
 
       - name: Build Signed Release APK
         env:
-          KEYSTORE_PATH: ${{ github.workspace }}/release.jks
-          STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEYSTORE_PATH: ${{ env.KEYSTORE_PATH }}
+          STORE_PASSWORD: ${{ env.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ env.KEY_PASSWORD }}
+          KEY_ALIAS: upload
+          JAVA_OPTS: "-Djava.awt.headless=true"
+          GRADLE_OPTS: "-Djava.awt.headless=true -Dorg.gradle.daemon=false"
         run: |
           if [ -f "./gradlew" ]; then
             ./gradlew assembleRelease --no-daemon --stacktrace
@@ -96,7 +116,8 @@ jobs:
             - Barcode & QR Code Scanner with In-Store Price Verification
             - Total Basket Price Comparison with Best Value Detection
             - Supermarket Mode with Live Budget Tracking HUD
-            - Full Arabic (RTL) & Algerian Dinar (د.ج / DA) localization
+            - Settings Screen: Language (Arabic/English), Dark/Light Mode, Google Drive Backup & Restore
+            - Developed by Charfeddine Ka
             
             #### 📲 Installation Instructions:
             1. Download the attached `ShopyPelse-v${{ env.VERSION_NAME }}.apk` below.
