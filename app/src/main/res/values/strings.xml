@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">ShopyPelse</string>
+    <string name="currency_dzd">د.ج</string>
+    <string name="currency_dzd_latin">DA</string>
+    <string name="best_value">أفضل سعر</string>
+    <string name="shopping_list">قائمة التسوق</string>
+    <string name="price_comparison">مقارنة الأسعار</string>
+    <string name="scanner">الماسح الضوئي</string>
+    <string name="supermarket_mode">وضع السوبرماركت</string>
+</resources>

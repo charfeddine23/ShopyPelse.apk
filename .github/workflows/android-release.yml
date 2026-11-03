@@ -1,0 +1,109 @@
+name: Android Release CI/CD
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build & Publish Signed Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Grant Execute Permission for Gradle Wrapper
+        run: |
+          if [ -f "./gradlew" ]; then
+            chmod +x gradlew
+          fi
+
+      - name: Extract Version Info from Gradle
+        id: extract_version
+        run: |
+          VERSION_NAME=$(grep -E '^\s*versionName\s*=\s*' app/build.gradle.kts | head -1 | sed -E 's/.*versionName\s*=\s*"([^"]+)".*/\1/')
+          VERSION_CODE=$(grep -E '^\s*versionCode\s*=\s*' app/build.gradle.kts | head -1 | sed -E 's/.*versionCode\s*=\s*([0-9]+).*/\1/')
+          
+          if [ -z "$VERSION_NAME" ]; then
+            VERSION_NAME="1.0"
+          fi
+          if [ -z "$VERSION_CODE" ]; then
+            VERSION_CODE="1"
+          fi
+          
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
+          echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
+          echo "TAG_NAME=v$VERSION_NAME" >> $GITHUB_ENV
+          echo "Extracted Version: $VERSION_NAME (Build $VERSION_CODE)"
+
+      - name: Decode Keystore from Secret
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > "${{ github.workspace }}/release.jks"
+
+      - name: Build Signed Release APK
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/release.jks
+          STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          if [ -f "./gradlew" ]; then
+            ./gradlew assembleRelease --no-daemon --stacktrace
+          else
+            gradle assembleRelease --no-daemon --stacktrace
+          fi
+
+      - name: Prepare Release APK Artifact
+        run: |
+          APK_SRC=$(find app/build/outputs/apk/release/ -name "*.apk" | head -1)
+          APK_DEST="ShopyPelse-v${{ env.VERSION_NAME }}.apk"
+          
+          if [ -f "$APK_SRC" ]; then
+            cp "$APK_SRC" "$APK_DEST"
+            echo "Successfully prepared: $APK_DEST"
+          else
+            echo "ERROR: Release APK not found in app/build/outputs/apk/release/"
+            exit 1
+          fi
+
+      - name: Create GitHub Release & Upload APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: "ShopyPelse v${{ env.VERSION_NAME }} (Build ${{ env.VERSION_CODE }})"
+          body: |
+            ### 🚀 ShopyPelse v${{ env.VERSION_NAME }} Release
+            
+            **What's New:**
+            - Automated Production Release APK: `ShopyPelse-v${{ env.VERSION_NAME }}.apk`
+            - Built from commit `${{ github.sha }}` on branch `main`
+            - Liquid Glass M5 Dark Mode Aesthetics
+            - Smart Offline Shopping List & Auto-Categorization
+            - Barcode & QR Code Scanner with In-Store Price Verification
+            - Total Basket Price Comparison with Best Value Detection
+            - Supermarket Mode with Live Budget Tracking HUD
+            - Full Arabic (RTL) & Algerian Dinar (د.ج / DA) localization
+            
+            #### 📲 Installation Instructions:
+            1. Download the attached `ShopyPelse-v${{ env.VERSION_NAME }}.apk` below.
+            2. Open the APK on your Android device (ensure "Install from unknown sources" is enabled if prompted).
+            3. Existing installations will update seamlessly in place without data loss.
+          files: ShopyPelse-v${{ env.VERSION_NAME }}.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
