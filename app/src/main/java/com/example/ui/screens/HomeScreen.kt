@@ -107,8 +107,8 @@ fun HomeScreen(
     onNavigateToScanner: () -> Unit,
     onNavigateToPriceComparison: () -> Unit,
     onNavigateToSupermarketMode: () -> Unit,
-    onNavigateToSettings: () -> Unit,
-    onOpenQrShare: () -> Unit,
+    onNavigateToSettings: () -> Unit = {},
+    onOpenQrShare: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val items by viewModel.shoppingItems.collectAsStateWithLifecycle()
@@ -139,8 +139,6 @@ fun HomeScreen(
             item {
                 HomeHeader(
                     isArabic = isArabic,
-                    onNavigateToSettings = onNavigateToSettings,
-                    onOpenQrShare = onOpenQrShare,
                     onStartSupermarketMode = onNavigateToSupermarketMode
                 )
             }
@@ -300,8 +298,6 @@ fun HomeScreen(
 @Composable
 private fun HomeHeader(
     isArabic: Boolean,
-    onNavigateToSettings: () -> Unit,
-    onOpenQrShare: () -> Unit,
     onStartSupermarketMode: () -> Unit
 ) {
     Row(
@@ -327,80 +323,35 @@ private fun HomeHeader(
         }
 
         val isLight = MaterialTheme.colorScheme.background == BackgroundLight
-        val iconBtnBg = if (isLight) Color.White else Color(0x22FFFFFF)
-        val iconBtnBorder = if (isLight) BorderStroke(1.dp, LightCardBorder) else BorderStroke(1.dp, Color(0x20FFFFFF))
+        val shopPillBg = if (isLight) MintTintBg else EmeraldSavings.copy(alpha = 0.2f)
+        val shopPillBorder = if (isLight) MintTintBorder else EmeraldSavings
+        val shopPillContent = if (isLight) MintTintText else EmeraldSavings
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            // Settings Button
-            IconButton(
-                onClick = onNavigateToSettings,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(iconBtnBg)
-                    .border(iconBtnBorder, CircleShape)
-                    .size(40.dp)
-                    .testTag("settings_button")
-            ) {
+        // Cart / Supermarket Mode Button
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(shopPillBg)
+                .border(BorderStroke(1.dp, shopPillBorder), RoundedCornerShape(20.dp))
+                .clickable(onClick = onStartSupermarketMode)
+                .padding(horizontal = 14.dp, vertical = 8.dp)
+                .testTag("supermarket_mode_header_pill"),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "Settings",
-                    tint = if (isLight) CyanTintText else ElectricCyan,
-                    modifier = Modifier.size(20.dp)
+                    imageVector = Icons.Default.ShoppingCart,
+                    contentDescription = null,
+                    tint = shopPillContent,
+                    modifier = Modifier.size(17.dp)
                 )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            // QR Share List Button
-            IconButton(
-                onClick = onOpenQrShare,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(iconBtnBg)
-                    .border(iconBtnBorder, CircleShape)
-                    .size(40.dp)
-                    .testTag("share_qr_button")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.QrCode,
-                    contentDescription = "Share QR",
-                    tint = if (isLight) MintTintText else EmeraldSavings,
-                    modifier = Modifier.size(20.dp)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (isArabic) "السلة" else "Cart",
+                    color = shopPillContent,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
                 )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            // Supermarket Mode Pill
-            val shopPillBg = if (isLight) MintTintBg else EmeraldSavings.copy(alpha = 0.2f)
-            val shopPillBorder = if (isLight) MintTintBorder else EmeraldSavings
-            val shopPillContent = if (isLight) MintTintText else EmeraldSavings
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(shopPillBg)
-                    .border(BorderStroke(1.dp, shopPillBorder), RoundedCornerShape(20.dp))
-                    .clickable(onClick = onStartSupermarketMode)
-                    .padding(horizontal = 10.dp, vertical = 8.dp)
-                    .testTag("supermarket_mode_header_pill"),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.ShoppingCart,
-                        contentDescription = null,
-                        tint = shopPillContent,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = if (isArabic) "السلة" else "Cart",
-                        color = shopPillContent,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
             }
         }
     }
@@ -681,10 +632,11 @@ fun ShoppingItemRow(
     )
 
     val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+    // Solid 100% opaque backgrounds: Zero transparency so the red delete strip never shows through
     val cardBackground = if (item.isChecked) {
-        if (isLight) Color(0xFFF1F5F9) else Color(0x1A142030)
+        if (isLight) Color(0xFFF1F5F9) else Color(0xFF0F172A)
     } else {
-        if (isLight) LightCardSurface else GlassSurfaceDark
+        if (isLight) Color(0xFFFFFFFF) else Color(0xFF131D31)
     }
     val uncheckBorder = if (isLight) Color(0xFF94A3B8) else Color(0x60FFFFFF)
     val itemPriceColor = if (isLight) MintTintText else EmeraldSavings

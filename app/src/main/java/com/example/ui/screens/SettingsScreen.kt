@@ -1,6 +1,5 @@
 package com.example.ui.screens
 
-import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,21 +27,20 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudUpload
-import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Verified
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,18 +59,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.components.GlowingActionButton
 import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.NeonBadge
+import com.example.ui.components.QrShareDialog
 import com.example.ui.theme.BackgroundLight
 import com.example.ui.theme.CyanTintBg
 import com.example.ui.theme.CyanTintBorder
 import com.example.ui.theme.CyanTintText
 import com.example.ui.theme.ElectricCyan
 import com.example.ui.theme.EmeraldSavings
-import com.example.ui.theme.GlassBorder
 import com.example.ui.theme.LightCardBorder
-import com.example.ui.theme.LightCardSurface
-import com.example.ui.theme.MintTintBg
-import com.example.ui.theme.MintTintBorder
-import com.example.ui.theme.MintTintText
 import com.example.ui.theme.NeonAmber
 import com.example.ui.theme.PeachTintBg
 import com.example.ui.theme.PeachTintBorder
@@ -88,6 +82,7 @@ import java.io.InputStreamReader
 fun SettingsScreen(
     viewModel: ShoppingViewModel,
     onBack: () -> Unit,
+    onOpenQrShare: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -95,8 +90,7 @@ fun SettingsScreen(
     val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
     val lastBackupDate by viewModel.lastBackupDate.collectAsStateWithLifecycle()
 
-    var showRestoreDialog by remember { mutableStateOf(false) }
-    var restoreInputText by remember { mutableStateOf("") }
+    var showQrDialog by remember { mutableStateOf(false) }
 
     // Storage Access Framework Launcher to save backup file to Google Drive or local device
     val createDocLauncher = rememberLauncherForActivityResult(
@@ -175,7 +169,7 @@ fun SettingsScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = if (isArabic) "تخصيص التطبيق، النسخ الاحتياطي، ومعلومات المطور" else "Preferences, Google Drive Backup & Developer info",
+                            text = if (isArabic) "تخصيص التطبيق، مزامنة ونقل البيانات" else "Preferences, data sync & app settings",
                             color = TextSecondary,
                             fontSize = 12.sp
                         )
@@ -207,7 +201,6 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            // Arabic Option (RTL)
                             LanguageOptionPill(
                                 title = "العربية (RTL)",
                                 subtitle = "الافتراضية بالدينار الجزائري",
@@ -216,7 +209,6 @@ fun SettingsScreen(
                                 modifier = Modifier.weight(1f)
                             )
 
-                            // English Option (LTR)
                             LanguageOptionPill(
                                 title = "English (LTR)",
                                 subtitle = "Standard Latin Layout",
@@ -253,7 +245,6 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            // Dark Mode
                             ThemeOptionPill(
                                 icon = Icons.Default.DarkMode,
                                 title = if (isArabic) "الوضع الليلي" else "Dark Mode",
@@ -263,7 +254,6 @@ fun SettingsScreen(
                                 modifier = Modifier.weight(1f)
                             )
 
-                            // Light Mode
                             ThemeOptionPill(
                                 icon = Icons.Default.LightMode,
                                 title = if (isArabic) "الوضع النهاري" else "Light Mode",
@@ -277,11 +267,11 @@ fun SettingsScreen(
                 }
             }
 
-            // 3. Google Drive Backup & Restore Card
+            // 3. QR Code Data Transfer & Offline Sharing (Prominent & Coordinated)
             item {
                 SettingsSectionHeader(
-                    icon = Icons.Default.CloudDone,
-                    title = if (isArabic) "النسخ الاحتياطي في Google Drive" else "Google Drive Cloud Backup & Restore",
+                    icon = Icons.Default.QrCode,
+                    title = if (isArabic) "نقل ومشاركة القوائم عبر كود QR" else "QR Code List Transfer & Sync",
                     accentColor = EmeraldSavings
                 )
 
@@ -300,17 +290,115 @@ fun SettingsScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(
                                     modifier = Modifier
-                                        .size(38.dp)
+                                        .size(40.dp)
                                         .clip(RoundedCornerShape(10.dp))
                                         .background(EmeraldSavings.copy(alpha = 0.2f))
                                         .border(BorderStroke(1.dp, EmeraldSavings), RoundedCornerShape(10.dp)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.CloudDone,
+                                        imageVector = Icons.Default.QrCode,
                                         contentDescription = null,
                                         tint = EmeraldSavings,
-                                        modifier = Modifier.size(22.dp)
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = if (isArabic) "المزامنة المباشرة بالـ QR" else "Direct QR Transfer",
+                                        color = TextPrimary,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = if (isArabic) "نقل واستيراد القوائم فلاشياً بدون إنترنت" else "Share & import lists offline instantly",
+                                        color = TextSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+
+                            NeonBadge(
+                                text = if (isArabic) "دون إنترنت" else "OFFLINE",
+                                accentColor = EmeraldSavings
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Text(
+                            text = if (isArabic) {
+                                "يمكنك عرض كود QR لمسحه من هاتف آخر ونقل كامل قائمة المشتريات فوراً، أو استيراد قائمة جديدة عبر لصق الكود."
+                            } else {
+                                "Display a QR code to transfer your shopping list to another device, or import a shared list by pasting/scanning."
+                            },
+                            color = TextSecondary,
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Action Buttons: Share QR / Import QR
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            GlowingActionButton(
+                                text = if (isArabic) "مشاركة القائمة بالـ QR" else "Share via QR",
+                                icon = Icons.Default.Share,
+                                color = EmeraldSavings,
+                                onClick = { showQrDialog = true },
+                                modifier = Modifier.weight(1f)
+                            )
+
+                            GlowingActionButton(
+                                text = if (isArabic) "استيراد قائمة" else "Import List",
+                                icon = Icons.Default.Download,
+                                color = ElectricCyan,
+                                onClick = { showQrDialog = true },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 4. Google Drive Cloud Backup & Restore Card
+            item {
+                SettingsSectionHeader(
+                    icon = Icons.Default.CloudDone,
+                    title = if (isArabic) "النسخ الاحتياطي في Google Drive" else "Google Drive Cloud Backup & Restore",
+                    accentColor = ElectricCyan
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                LiquidGlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    glowColor = ElectricCyan
+                ) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(ElectricCyan.copy(alpha = 0.2f))
+                                        .border(BorderStroke(1.dp, ElectricCyan), RoundedCornerShape(10.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CloudDone,
+                                        contentDescription = null,
+                                        tint = ElectricCyan,
+                                        modifier = Modifier.size(24.dp)
                                     )
                                 }
                                 Spacer(modifier = Modifier.width(10.dp))
@@ -331,7 +419,7 @@ fun SettingsScreen(
 
                             NeonBadge(
                                 text = if (isArabic) "سحابي" else "CLOUD",
-                                accentColor = EmeraldSavings
+                                accentColor = ElectricCyan
                             )
                         }
 
@@ -370,7 +458,6 @@ fun SettingsScreen(
                                 icon = Icons.Default.CloudUpload,
                                 color = EmeraldSavings,
                                 onClick = {
-                                    // Launch Storage Access Framework to save to Google Drive or Local Drive
                                     createDocLauncher.launch("ShopyPelse_Backup_${System.currentTimeMillis()}.json")
                                 },
                                 modifier = Modifier.weight(1f)
@@ -389,7 +476,7 @@ fun SettingsScreen(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // Instant direct simulator sync
+                        // Quick Sync Simulator
                         val isLight = MaterialTheme.colorScheme.background == BackgroundLight
                         val syncBg = if (isLight) CyanTintBg else Color(0x18FFFFFF)
                         val syncBorder = if (isLight) BorderStroke(1.dp, CyanTintBorder) else BorderStroke(1.dp, Color(0x20FFFFFF))
@@ -408,7 +495,7 @@ fun SettingsScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = if (isArabic) "⚡ مزامنة سريعة وتحديث حالة Drive الآن" else "⚡ Quick Sync & Refresh Drive Status Now",
+                                text = if (isArabic) "⚡ مزامنة وتحديث حالة Drive الآن" else "⚡ Refresh Cloud Status Now",
                                 color = syncText,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold
@@ -418,7 +505,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 4. Developer & App Information Card
+            // 5. Developer & App Information Card
             item {
                 SettingsSectionHeader(
                     icon = Icons.Default.Info,
@@ -437,7 +524,6 @@ fun SettingsScreen(
                         val devBannerBg = if (isLightCard) CyanTintBg else Color(0x2800E5FF)
                         val devBannerBorder = if (isLightCard) BorderStroke(1.dp, CyanTintBorder) else BorderStroke(1.dp, Color(0x6600E5FF))
 
-                        // Developer Banner
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -493,7 +579,6 @@ fun SettingsScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // Metadata Grid: Version, Release Date, App Name
                         InfoRow(
                             label = if (isArabic) "اسم التطبيق" else "App Name",
                             value = "ShopyPelse (شوبي بلس)"
@@ -523,10 +608,21 @@ fun SettingsScreen(
                 }
             }
 
-            // Bottom spacing
             item {
                 Spacer(modifier = Modifier.height(30.dp))
             }
+        }
+
+        // Dedicated Offline QR Share & Import Dialog
+        if (showQrDialog) {
+            QrShareDialog(
+                payload = viewModel.getQrSharePayload(),
+                isArabic = isArabic,
+                onDismiss = { showQrDialog = false },
+                onImportPayload = { payload ->
+                    viewModel.importListFromQr(payload)
+                }
+            )
         }
     }
 }

@@ -95,6 +95,12 @@ private fun DeleteBackground(
     label: String
 ) {
     val direction = dismissState.dismissDirection
+
+    // Never render the red strip unless actively swiping
+    if (direction != SwipeToDismissBoxValue.StartToEnd && direction != SwipeToDismissBoxValue.EndToStart) {
+        return
+    }
+
     val alignment = when (direction) {
         SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
         SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd

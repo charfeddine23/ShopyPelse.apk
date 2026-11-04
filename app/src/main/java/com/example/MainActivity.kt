@@ -193,7 +193,8 @@ fun SoukSmartApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
 
                         Screen.SETTINGS -> SettingsScreen(
                             viewModel = viewModel,
-                            onBack = { currentScreen = Screen.HOME }
+                            onBack = { currentScreen = Screen.HOME },
+                            onOpenQrShare = { showQrShareDialog = true }
                         )
                     }
                 }
@@ -271,6 +272,15 @@ fun LiquidGlassBottomNavBar(
                     accentColor = EmeraldSavings,
                     onClick = { onSelectScreen(Screen.PRICES) },
                     testTag = "nav_prices"
+                )
+
+                NavItem(
+                    icon = Icons.Default.Settings,
+                    label = if (isArabic) "الإعدادات" else "Settings",
+                    isSelected = currentScreen == Screen.SETTINGS,
+                    accentColor = NeonAmber,
+                    onClick = { onSelectScreen(Screen.SETTINGS) },
+                    testTag = "nav_settings"
                 )
             }
         }

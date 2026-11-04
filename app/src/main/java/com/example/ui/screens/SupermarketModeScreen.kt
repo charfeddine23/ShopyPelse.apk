@@ -33,9 +33,11 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import com.example.ui.theme.BackgroundLight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -488,11 +490,18 @@ fun SupermarketItemCard(
         label = "big_check_color"
     )
 
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+    val cardBackground = if (item.isChecked) {
+        if (isLight) Color(0xFFF1F5F9) else Color(0xFF0F172A)
+    } else {
+        if (isLight) Color(0xFFFFFFFF) else Color(0xFF131D31)
+    }
+
     LiquidGlassCard(
         modifier = modifier
             .fillMaxWidth()
             .testTag("supermarket_item_${item.id}"),
-        backgroundColor = if (item.isChecked) Color(0x18101E2E) else GlassSurface,
+        backgroundColor = cardBackground,
         glowColor = if (item.isChecked) null else EmeraldSavings.copy(alpha = 0.4f),
         onClick = onToggleChecked
     ) {
