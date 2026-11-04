@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -59,11 +60,20 @@ import com.example.data.model.StoreBasketSummary
 import com.example.ui.components.GlowingActionButton
 import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.NeonBadge
+import com.example.ui.theme.BackgroundLight
+import com.example.ui.theme.CyanTintBg
+import com.example.ui.theme.CyanTintBorder
+import com.example.ui.theme.CyanTintText
 import com.example.ui.theme.ElectricCyan
 import com.example.ui.theme.EmeraldSavings
 import com.example.ui.theme.GlassBorder
 import com.example.ui.theme.GlassSurface
 import com.example.ui.theme.GlassSurfaceLight
+import com.example.ui.theme.LightCardBorder
+import com.example.ui.theme.LightCardSurface
+import com.example.ui.theme.MintTintBg
+import com.example.ui.theme.MintTintBorder
+import com.example.ui.theme.MintTintText
 import com.example.ui.theme.NeonAmber
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
@@ -112,18 +122,23 @@ fun PriceComparisonScreen(
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+                    val backBtnBg = if (isLight) Color.White else Color(0x33FFFFFF)
+                    val backBtnBorder = if (isLight) BorderStroke(1.dp, LightCardBorder) else BorderStroke(1.dp, Color(0x20FFFFFF))
+
                     IconButton(
                         onClick = onBack,
                         modifier = Modifier
                             .clip(CircleShape)
-                            .background(Color(0x33FFFFFF))
+                            .background(backBtnBg)
+                            .border(backBtnBorder, CircleShape)
                             .size(40.dp)
                             .testTag("price_comparison_back")
                     ) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = "Back",
-                            tint = TextPrimary
+                            tint = if (isLight) CyanTintText else TextPrimary
                         )
                     }
 
@@ -147,6 +162,7 @@ fun PriceComparisonScreen(
 
             // Search Bar
             item {
+                val isLight = MaterialTheme.colorScheme.background == BackgroundLight
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
@@ -157,7 +173,11 @@ fun PriceComparisonScreen(
                         )
                     },
                     leadingIcon = {
-                        Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = ElectricCyan)
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            tint = if (isLight) CyanTintText else ElectricCyan
+                        )
                     },
                     singleLine = true,
                     modifier = Modifier
@@ -166,9 +186,9 @@ fun PriceComparisonScreen(
                         .testTag("search_price_input"),
                     shape = RoundedCornerShape(16.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color(0x33141F32),
-                        unfocusedContainerColor = Color(0x22141F32),
-                        focusedBorderColor = ElectricCyan,
+                        focusedContainerColor = if (isLight) Color.White else Color(0x33141F32),
+                        unfocusedContainerColor = if (isLight) Color.White else Color(0x22141F32),
+                        focusedBorderColor = if (isLight) CyanTintBorder else ElectricCyan,
                         unfocusedBorderColor = GlassBorder,
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary
@@ -291,21 +311,28 @@ private fun TotalBasketSection(
                     modifier = Modifier.padding(vertical = 12.dp)
                 )
             } else {
+                val isLight = MaterialTheme.colorScheme.background == BackgroundLight
                 summaries.forEachIndexed { index, summary ->
                     val isCheapest = summary.isBestValue
+                    val rowBg = if (isLight) {
+                        if (isCheapest) MintTintBg else Color(0xFFF8FAFC)
+                    } else {
+                        if (isCheapest) Color(0x2E00E676) else Color(0x12FFFFFF)
+                    }
+                    val rowBorder = if (isLight) {
+                        if (isCheapest) BorderStroke(1.5.dp, MintTintBorder) else BorderStroke(1.dp, LightCardBorder)
+                    } else {
+                        if (isCheapest) BorderStroke(1.dp, EmeraldSavings.copy(alpha = 0.5f)) else BorderStroke(1.dp, Color(0x10FFFFFF))
+                    }
+                    val saveTextColor = if (isLight) MintTintText else EmeraldSavings
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(if (isCheapest) Color(0x2E00E676) else Color(0x12FFFFFF))
-                            .border(
-                                BorderStroke(
-                                    1.dp,
-                                    if (isCheapest) EmeraldSavings.copy(alpha = 0.5f) else Color(0x10FFFFFF)
-                                ),
-                                RoundedCornerShape(12.dp)
-                            )
+                            .background(rowBg)
+                            .border(rowBorder, RoundedCornerShape(12.dp))
                             .padding(horizontal = 14.dp, vertical = 10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
@@ -313,7 +340,7 @@ private fun TotalBasketSection(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = "#${index + 1}",
-                                color = if (isCheapest) EmeraldSavings else TextSecondary,
+                                color = if (isCheapest) saveTextColor else TextSecondary,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.width(26.dp)
@@ -332,7 +359,7 @@ private fun TotalBasketSection(
                                         } else {
                                             "Save ${LocalizationUtil.formatDzd(summary.savingsComparedToMaxDzd, false)}"
                                         },
-                                        color = EmeraldSavings,
+                                        color = saveTextColor,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -350,7 +377,7 @@ private fun TotalBasketSection(
                             }
                             Text(
                                 text = LocalizationUtil.formatDzd(summary.totalDzd, isArabic),
-                                color = if (isCheapest) EmeraldSavings else TextPrimary,
+                                color = if (isCheapest) saveTextColor else TextPrimary,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -413,14 +440,28 @@ fun ProductPriceMatrixCard(
             Spacer(modifier = Modifier.height(10.dp))
 
             // Supermarket Price Breakdown
+            val isLight = MaterialTheme.colorScheme.background == BackgroundLight
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 prices.forEach { price ->
                     val isCheapest = price.priceDzd == minPrice
+                    val rowBg = if (isLight) {
+                        if (isCheapest) MintTintBg else Color(0xFFF8FAFC)
+                    } else {
+                        if (isCheapest) Color(0x2200E676) else Color(0x10FFFFFF)
+                    }
+                    val rowBorder = if (isLight) {
+                        if (isCheapest) BorderStroke(1.dp, MintTintBorder) else BorderStroke(1.dp, LightCardBorder)
+                    } else {
+                        BorderStroke(1.dp, Color.Transparent)
+                    }
+                    val priceTextColor = if (isCheapest) (if (isLight) MintTintText else EmeraldSavings) else TextPrimary
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(10.dp))
-                            .background(if (isCheapest) Color(0x2200E676) else Color(0x10FFFFFF))
+                            .background(rowBg)
+                            .border(rowBorder, RoundedCornerShape(10.dp))
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
@@ -432,7 +473,7 @@ fun ProductPriceMatrixCard(
                             Icon(
                                 imageVector = Icons.Default.Storefront,
                                 contentDescription = null,
-                                tint = if (isCheapest) EmeraldSavings else TextSecondary,
+                                tint = if (isCheapest) (if (isLight) MintTintText else EmeraldSavings) else TextSecondary,
                                 modifier = Modifier.size(15.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
@@ -454,7 +495,7 @@ fun ProductPriceMatrixCard(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = LocalizationUtil.formatDzd(price.priceDzd, isArabic),
-                                color = if (isCheapest) EmeraldSavings else TextPrimary,
+                                color = priceTextColor,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -469,7 +510,7 @@ fun ProductPriceMatrixCard(
                                 Icon(
                                     imageVector = Icons.Default.Edit,
                                     contentDescription = "Report Price",
-                                    tint = ElectricCyan.copy(alpha = 0.7f),
+                                    tint = if (isLight) CyanTintText else ElectricCyan.copy(alpha = 0.7f),
                                     modifier = Modifier.size(14.dp)
                                 )
                             }
@@ -489,10 +530,11 @@ private fun ReportPriceDialog(
     onSubmit: (storeName: String, storeNameAr: String, newPrice: Double) -> Unit
 ) {
     var priceText by remember { mutableStateOf(priceItem.priceDzd.toInt().toString()) }
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF131B2A),
+        containerColor = if (isLight) Color.White else Color(0xFF131C2E),
         title = {
             Text(
                 text = if (isArabic) "تحديث سعر المنتج" else "Update Store Price",

@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -60,10 +61,22 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.components.GlowingActionButton
 import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.NeonBadge
+import com.example.ui.theme.BackgroundLight
+import com.example.ui.theme.CyanTintBg
+import com.example.ui.theme.CyanTintBorder
+import com.example.ui.theme.CyanTintText
 import com.example.ui.theme.ElectricCyan
 import com.example.ui.theme.EmeraldSavings
 import com.example.ui.theme.GlassBorder
+import com.example.ui.theme.LightCardBorder
+import com.example.ui.theme.LightCardSurface
+import com.example.ui.theme.MintTintBg
+import com.example.ui.theme.MintTintBorder
+import com.example.ui.theme.MintTintText
 import com.example.ui.theme.NeonAmber
+import com.example.ui.theme.PeachTintBg
+import com.example.ui.theme.PeachTintBorder
+import com.example.ui.theme.PeachTintText
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
@@ -126,6 +139,10 @@ fun SettingsScreen(
         ) {
             // Top Bar
             item {
+                val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+                val backBtnBg = if (isLight) Color.White else Color(0x33FFFFFF)
+                val backBtnBorder = if (isLight) BorderStroke(1.dp, LightCardBorder) else BorderStroke(1.dp, Color(0x20FFFFFF))
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -136,14 +153,15 @@ fun SettingsScreen(
                         onClick = onBack,
                         modifier = Modifier
                             .clip(CircleShape)
-                            .background(Color(0x33FFFFFF))
+                            .background(backBtnBg)
+                            .border(backBtnBorder, CircleShape)
                             .size(42.dp)
                             .testTag("settings_back_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = "Back",
-                            tint = TextPrimary
+                            tint = if (isLight) CyanTintText else TextPrimary
                         )
                     }
 
@@ -372,11 +390,17 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(10.dp))
 
                         // Instant direct simulator sync
+                        val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+                        val syncBg = if (isLight) CyanTintBg else Color(0x18FFFFFF)
+                        val syncBorder = if (isLight) BorderStroke(1.dp, CyanTintBorder) else BorderStroke(1.dp, Color(0x20FFFFFF))
+                        val syncText = if (isLight) CyanTintText else ElectricCyan
+
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0x18FFFFFF))
+                                .background(syncBg)
+                                .border(syncBorder, RoundedCornerShape(10.dp))
                                 .clickable {
                                     viewModel.markGoogleDriveBackupDone()
                                 }
@@ -385,7 +409,7 @@ fun SettingsScreen(
                         ) {
                             Text(
                                 text = if (isArabic) "⚡ مزامنة سريعة وتحديث حالة Drive الآن" else "⚡ Quick Sync & Refresh Drive Status Now",
-                                color = ElectricCyan,
+                                color = syncText,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -409,13 +433,17 @@ fun SettingsScreen(
                     glowColor = ElectricCyan
                 ) {
                     Column(modifier = Modifier.padding(18.dp)) {
+                        val isLightCard = MaterialTheme.colorScheme.background == BackgroundLight
+                        val devBannerBg = if (isLightCard) CyanTintBg else Color(0x2800E5FF)
+                        val devBannerBorder = if (isLightCard) BorderStroke(1.dp, CyanTintBorder) else BorderStroke(1.dp, Color(0x6600E5FF))
+
                         // Developer Banner
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(14.dp))
-                                .background(Color(0x2800E5FF))
-                                .border(BorderStroke(1.dp, Color(0x6600E5FF)), RoundedCornerShape(14.dp))
+                                .background(devBannerBg)
+                                .border(devBannerBorder, RoundedCornerShape(14.dp))
                                 .padding(14.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -456,7 +484,7 @@ fun SettingsScreen(
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = if (isArabic) "مهندس ومطور التطبيق الرسمي" else "Lead Mobile Software Engineer & UI/UX Designer",
-                                    color = ElectricCyan,
+                                    color = if (isLightCard) CyanTintText else ElectricCyan,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -537,24 +565,35 @@ private fun LanguageOptionPill(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+    val pillBg = if (isLight) {
+        if (isSelected) CyanTintBg else Color.White
+    } else {
+        if (isSelected) ElectricCyan.copy(alpha = 0.2f) else Color(0x18FFFFFF)
+    }
+    val pillBorder = if (isLight) {
+        if (isSelected) BorderStroke(1.5.dp, CyanTintBorder) else BorderStroke(1.dp, LightCardBorder)
+    } else {
+        if (isSelected) BorderStroke(1.5.dp, ElectricCyan) else BorderStroke(1.dp, Color(0x20FFFFFF))
+    }
+    val titleColor = if (isLight) {
+        if (isSelected) CyanTintText else TextPrimary
+    } else {
+        if (isSelected) ElectricCyan else TextPrimary
+    }
+
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
-            .background(if (isSelected) ElectricCyan.copy(alpha = 0.2f) else Color(0x18FFFFFF))
-            .border(
-                BorderStroke(
-                    1.5.dp,
-                    if (isSelected) ElectricCyan else Color(0x20FFFFFF)
-                ),
-                RoundedCornerShape(14.dp)
-            )
+            .background(pillBg)
+            .border(pillBorder, RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
             .padding(12.dp)
     ) {
         Column {
             Text(
                 text = title,
-                color = if (isSelected) ElectricCyan else TextPrimary,
+                color = titleColor,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -577,17 +616,24 @@ private fun ThemeOptionPill(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+    val pillBg = if (isLight) {
+        if (isSelected) PeachTintBg else Color.White
+    } else {
+        if (isSelected) NeonAmber.copy(alpha = 0.2f) else Color(0x18FFFFFF)
+    }
+    val pillBorder = if (isLight) {
+        if (isSelected) BorderStroke(1.5.dp, PeachTintBorder) else BorderStroke(1.dp, LightCardBorder)
+    } else {
+        if (isSelected) BorderStroke(1.5.dp, NeonAmber) else BorderStroke(1.dp, Color(0x20FFFFFF))
+    }
+    val pillAccent = if (isLight) PeachTintText else NeonAmber
+
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
-            .background(if (isSelected) NeonAmber.copy(alpha = 0.2f) else Color(0x18FFFFFF))
-            .border(
-                BorderStroke(
-                    1.5.dp,
-                    if (isSelected) NeonAmber else Color(0x20FFFFFF)
-                ),
-                RoundedCornerShape(14.dp)
-            )
+            .background(pillBg)
+            .border(pillBorder, RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
             .padding(12.dp)
     ) {
@@ -595,14 +641,14 @@ private fun ThemeOptionPill(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (isSelected) NeonAmber else TextSecondary,
+                tint = if (isSelected) pillAccent else TextSecondary,
                 modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Column {
                 Text(
                     text = title,
-                    color = if (isSelected) NeonAmber else TextPrimary,
+                    color = if (isSelected) pillAccent else TextPrimary,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 )

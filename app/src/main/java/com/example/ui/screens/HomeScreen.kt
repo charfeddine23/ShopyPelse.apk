@@ -43,6 +43,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -73,16 +74,27 @@ import com.example.data.model.ShoppingItem
 import com.example.ui.components.GlowingActionButton
 import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.NeonBadge
+import com.example.ui.theme.BackgroundLight
 import com.example.ui.theme.CheckedGreen
+import com.example.ui.theme.CyanTintBg
+import com.example.ui.theme.CyanTintBorder
+import com.example.ui.theme.CyanTintText
 import com.example.ui.theme.ElectricCyan
 import com.example.ui.theme.EmeraldSavings
 import com.example.ui.theme.GlassBorder
 import com.example.ui.theme.GlassSurface
+import com.example.ui.theme.GlassSurfaceDark
 import com.example.ui.theme.GlassSurfaceLight
+import com.example.ui.theme.LightCardBorder
+import com.example.ui.theme.LightCardSurface
+import com.example.ui.theme.MintTintBg
+import com.example.ui.theme.MintTintBorder
+import com.example.ui.theme.MintTintText
 import com.example.ui.theme.NeonAmber
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.TextSecondaryLight
 import com.example.ui.viewmodel.ShoppingViewModel
 import com.example.util.LocalizationUtil
 import kotlinx.coroutines.launch
@@ -242,10 +254,11 @@ fun HomeScreen(
 
     // Add Item Modal Bottom Sheet
     if (showAddDialog) {
+        val isLight = MaterialTheme.colorScheme.background == BackgroundLight
         ModalBottomSheet(
             onDismissRequest = { showAddDialog = false },
             sheetState = sheetState,
-            containerColor = Color(0xFF101726),
+            containerColor = if (isLight) Color.White else Color(0xFF101726),
             dragHandle = {
                 Box(
                     modifier = Modifier
@@ -253,7 +266,7 @@ fun HomeScreen(
                         .width(44.dp)
                         .height(4.dp)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(Color(0x40FFFFFF))
+                        .background(if (isLight) Color(0xFFCBD5E1) else Color(0x40FFFFFF))
                 )
             }
         ) {
@@ -313,20 +326,25 @@ private fun HomeHeader(
             )
         }
 
+        val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+        val iconBtnBg = if (isLight) Color.White else Color(0x22FFFFFF)
+        val iconBtnBorder = if (isLight) BorderStroke(1.dp, LightCardBorder) else BorderStroke(1.dp, Color(0x20FFFFFF))
+
         Row(verticalAlignment = Alignment.CenterVertically) {
             // Settings Button
             IconButton(
                 onClick = onNavigateToSettings,
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(Color(0x22FFFFFF))
+                    .background(iconBtnBg)
+                    .border(iconBtnBorder, CircleShape)
                     .size(40.dp)
                     .testTag("settings_button")
             ) {
                 Icon(
                     imageVector = Icons.Default.Settings,
                     contentDescription = "Settings",
-                    tint = ElectricCyan,
+                    tint = if (isLight) CyanTintText else ElectricCyan,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -338,14 +356,15 @@ private fun HomeHeader(
                 onClick = onOpenQrShare,
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(Color(0x22FFFFFF))
+                    .background(iconBtnBg)
+                    .border(iconBtnBorder, CircleShape)
                     .size(40.dp)
                     .testTag("share_qr_button")
             ) {
                 Icon(
                     imageVector = Icons.Default.QrCode,
                     contentDescription = "Share QR",
-                    tint = EmeraldSavings,
+                    tint = if (isLight) MintTintText else EmeraldSavings,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -353,11 +372,15 @@ private fun HomeHeader(
             Spacer(modifier = Modifier.width(8.dp))
 
             // Supermarket Mode Pill
+            val shopPillBg = if (isLight) MintTintBg else EmeraldSavings.copy(alpha = 0.2f)
+            val shopPillBorder = if (isLight) MintTintBorder else EmeraldSavings
+            val shopPillContent = if (isLight) MintTintText else EmeraldSavings
+
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
-                    .background(EmeraldSavings.copy(alpha = 0.2f))
-                    .border(BorderStroke(1.dp, EmeraldSavings), RoundedCornerShape(20.dp))
+                    .background(shopPillBg)
+                    .border(BorderStroke(1.dp, shopPillBorder), RoundedCornerShape(20.dp))
                     .clickable(onClick = onStartSupermarketMode)
                     .padding(horizontal = 10.dp, vertical = 8.dp)
                     .testTag("supermarket_mode_header_pill"),
@@ -367,13 +390,13 @@ private fun HomeHeader(
                     Icon(
                         imageVector = Icons.Default.ShoppingCart,
                         contentDescription = null,
-                        tint = EmeraldSavings,
+                        tint = shopPillContent,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = if (isArabic) "المتجر" else "Shop Mode",
-                        color = EmeraldSavings,
+                        color = shopPillContent,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -391,6 +414,7 @@ private fun HomeSummaryHud(
     onViewPrices: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
     LiquidGlassCard(
         modifier = modifier
             .fillMaxWidth()
@@ -419,16 +443,21 @@ private fun HomeSummaryHud(
                     )
                 }
 
+                val ratioBg = if (isLight) CyanTintBg else GlassSurfaceLight
+                val ratioBorder = if (isLight) BorderStroke(1.dp, CyanTintBorder) else BorderStroke(1.dp, Color(0x20FFFFFF))
+                val ratioText = if (isLight) CyanTintText else ElectricCyan
+
                 // Progress ratio pill
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
-                        .background(GlassSurfaceLight)
+                        .background(ratioBg)
+                        .border(ratioBorder, RoundedCornerShape(12.dp))
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Text(
                         text = "${stats.checkedCount}/${stats.totalCount} " + if (isArabic) "جاهز" else "done",
-                        color = ElectricCyan,
+                        color = ratioText,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -439,12 +468,16 @@ private fun HomeSummaryHud(
 
             // Best Value Store Banner
             if (bestStore != null) {
+                val bannerBg = if (isLight) MintTintBg else Color(0x2E00E676)
+                val bannerBorder = if (isLight) MintTintBorder else Color(0x6600E676)
+                val bannerSaveText = if (isLight) MintTintText else EmeraldSavings
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0x2E00E676))
-                        .border(BorderStroke(1.dp, Color(0x6600E676)), RoundedCornerShape(14.dp))
+                        .background(bannerBg)
+                        .border(BorderStroke(1.dp, bannerBorder), RoundedCornerShape(14.dp))
                         .clickable(onClick = onViewPrices)
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -457,7 +490,7 @@ private fun HomeSummaryHud(
                         Icon(
                             imageVector = Icons.Default.Storefront,
                             contentDescription = null,
-                            tint = EmeraldSavings,
+                            tint = if (isLight) MintTintText else EmeraldSavings,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -477,7 +510,7 @@ private fun HomeSummaryHud(
                                     } else {
                                         "Save ${LocalizationUtil.formatDzd(bestStore.savingsComparedToMaxDzd, false)}"
                                     },
-                                    color = EmeraldSavings,
+                                    color = bannerSaveText,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -501,6 +534,11 @@ private fun FrequentItemsSection(
     isArabic: Boolean,
     onAddPreset: (ShoppingItem) -> Unit
 ) {
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+    val presetCardBg = if (isLight) Color.White else Color(0x281F2A3E)
+    val presetCardBorder = if (isLight) BorderStroke(1.dp, LightCardBorder) else BorderStroke(1.dp, Color(0x33FFFFFF))
+    val presetPriceColor = if (isLight) MintTintText else EmeraldSavings
+
     Column(modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)) {
         Row(
             modifier = Modifier
@@ -511,7 +549,7 @@ private fun FrequentItemsSection(
             Icon(
                 imageVector = Icons.Default.LocalOffer,
                 contentDescription = null,
-                tint = ElectricCyan,
+                tint = if (isLight) CyanTintText else ElectricCyan,
                 modifier = Modifier.size(15.dp)
             )
             Spacer(modifier = Modifier.width(6.dp))
@@ -533,8 +571,8 @@ private fun FrequentItemsSection(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0x281F2A3E))
-                        .border(BorderStroke(1.dp, Color(0x33FFFFFF)), RoundedCornerShape(14.dp))
+                        .background(presetCardBg)
+                        .border(presetCardBorder, RoundedCornerShape(14.dp))
                         .clickable { onAddPreset(preset) }
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
@@ -542,7 +580,7 @@ private fun FrequentItemsSection(
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = null,
-                            tint = ElectricCyan,
+                            tint = if (isLight) CyanTintText else ElectricCyan,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
@@ -555,7 +593,7 @@ private fun FrequentItemsSection(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = LocalizationUtil.formatDzd(preset.estimatedPriceDzd, isArabic),
-                            color = EmeraldSavings,
+                            color = presetPriceColor,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -572,6 +610,8 @@ private fun CategoryChipsSection(
     isArabic: Boolean,
     onSelectCategory: (String) -> Unit
 ) {
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -587,28 +627,34 @@ private fun CategoryChipsSection(
                 LocalizationUtil.getCategoryLabel(category, isArabic)
             }
 
-            val bgColor by animateColorAsState(
-                targetValue = if (isSelected) ElectricCyan.copy(alpha = 0.25f) else Color(0x1F1E283A),
-                label = "chip_bg"
-            )
-            val borderBrush = if (isSelected) {
-                Brush.linearGradient(listOf(ElectricCyan, ElectricCyan.copy(alpha = 0.5f)))
+            val chipBg = if (isLight) {
+                if (isSelected) CyanTintBg else Color.White
             } else {
-                Brush.linearGradient(listOf(Color(0x20FFFFFF), Color(0x0AFFFFFF)))
+                if (isSelected) ElectricCyan.copy(alpha = 0.25f) else Color(0x1F1E283A)
+            }
+            val chipBorder = if (isLight) {
+                if (isSelected) BorderStroke(1.5.dp, CyanTintBorder) else BorderStroke(1.dp, LightCardBorder)
+            } else {
+                if (isSelected) BorderStroke(1.dp, ElectricCyan) else BorderStroke(1.dp, Color(0x20FFFFFF))
+            }
+            val chipTextColor = if (isLight) {
+                if (isSelected) CyanTintText else TextSecondaryLight
+            } else {
+                if (isSelected) ElectricCyan else TextSecondary
             }
 
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .background(bgColor)
-                    .border(BorderStroke(1.dp, borderBrush), RoundedCornerShape(12.dp))
+                    .background(chipBg)
+                    .border(chipBorder, RoundedCornerShape(12.dp))
                     .clickable { onSelectCategory(category) }
                     .padding(horizontal = 14.dp, vertical = 7.dp)
                     .testTag("category_chip_$category")
             ) {
                 Text(
                     text = label,
-                    color = if (isSelected) ElectricCyan else TextSecondary,
+                    color = chipTextColor,
                     fontSize = 13.sp,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                 )
@@ -634,11 +680,22 @@ fun ShoppingItemRow(
         label = "check_color"
     )
 
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+    val cardBackground = if (item.isChecked) {
+        if (isLight) Color(0xFFF1F5F9) else Color(0x1A142030)
+    } else {
+        if (isLight) LightCardSurface else GlassSurfaceDark
+    }
+    val uncheckBorder = if (isLight) Color(0xFF94A3B8) else Color(0x60FFFFFF)
+    val itemPriceColor = if (isLight) MintTintText else EmeraldSavings
+    val stepperBg = if (isLight) Color(0xFFEDF2F7) else Color(0x30182236)
+    val stepperBorder = if (isLight) BorderStroke(1.dp, LightCardBorder) else BorderStroke(1.dp, Color(0x15FFFFFF))
+
     LiquidGlassCard(
         modifier = modifier
             .fillMaxWidth()
             .testTag("shopping_item_${item.id}"),
-        backgroundColor = if (item.isChecked) Color(0x1A142030) else GlassSurface,
+        backgroundColor = cardBackground,
         glowColor = if (item.isChecked) null else if (item.barcode != null) ElectricCyan.copy(alpha = 0.3f) else null,
         onClick = onItemClick
     ) {
@@ -657,7 +714,7 @@ fun ShoppingItemRow(
                     .border(
                         BorderStroke(
                             2.dp,
-                            if (item.isChecked) CheckedGreen else Color(0x60FFFFFF)
+                            if (item.isChecked) CheckedGreen else uncheckBorder
                         ),
                         CircleShape
                     )
@@ -711,7 +768,7 @@ fun ShoppingItemRow(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = LocalizationUtil.formatDzd(item.estimatedPriceDzd * item.quantity, isArabic),
-                            color = EmeraldSavings,
+                            color = itemPriceColor,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -724,7 +781,8 @@ fun ShoppingItemRow(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0x30182236))
+                    .background(stepperBg)
+                    .border(stepperBorder, RoundedCornerShape(10.dp))
                     .padding(horizontal = 4.dp, vertical = 2.dp)
             ) {
                 Box(
@@ -736,7 +794,7 @@ fun ShoppingItemRow(
                 ) {
                     Text(
                         text = "–",
-                        color = ElectricCyan,
+                        color = if (isLight) CyanTintText else ElectricCyan,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -759,7 +817,7 @@ fun ShoppingItemRow(
                 ) {
                     Text(
                         text = "+",
-                        color = ElectricCyan,
+                        color = if (isLight) CyanTintText else ElectricCyan,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )

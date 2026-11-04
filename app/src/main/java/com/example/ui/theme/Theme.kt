@@ -24,14 +24,14 @@ private val LiquidGlassDarkColorScheme = darkColorScheme(
     onTertiary = Color(0xFF452B00),
 
     background = BackgroundDark,
-    onBackground = TextPrimary,
+    onBackground = TextPrimaryDark,
 
     surface = BackgroundSurfaceDark,
-    onSurface = TextPrimary,
+    onSurface = TextPrimaryDark,
     surfaceVariant = BackgroundSurfaceElevated,
-    onSurfaceVariant = TextSecondary,
+    onSurfaceVariant = TextSecondaryDark,
 
-    outline = GlassBorder,
+    outline = GlassBorderDark,
     outlineVariant = Color(0x1AFFFFFF),
 
     error = NeonRed,

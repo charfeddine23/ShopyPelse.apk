@@ -26,6 +26,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CompareArrows
@@ -72,6 +74,7 @@ import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SupermarketModeScreen
 import com.example.ui.theme.ElectricCyan
 import com.example.ui.theme.EmeraldSavings
+import com.example.ui.theme.NeonAmber
 import com.example.ui.theme.ShopyPelseTheme
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextSecondary
@@ -223,28 +226,25 @@ fun LiquidGlassBottomNavBar(
         modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-            .testTag("liquid_glass_bottom_nav")
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .testTag("liquid_glass_bottom_nav"),
+        contentAlignment = Alignment.Center
     ) {
+        // Floating Dark Capsule Pill (From Screenshots)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
-                .background(Color(0xE6101726))
+                .clip(RoundedCornerShape(36.dp))
+                .background(Color(0xFF0E1626))
                 .border(
-                    BorderStroke(
-                        1.dp,
-                        Brush.linearGradient(
-                            listOf(Color(0x33FFFFFF), Color(0x10FFFFFF))
-                        )
-                    ),
-                    RoundedCornerShape(24.dp)
+                    BorderStroke(1.dp, Color(0x33475569)),
+                    RoundedCornerShape(36.dp)
                 )
-                .padding(vertical = 4.dp, horizontal = 4.dp)
+                .padding(horizontal = 8.dp, vertical = 6.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceAround,
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 NavItem(
@@ -287,7 +287,7 @@ fun LiquidGlassBottomNavBar(
                     icon = Icons.Default.Settings,
                     label = if (isArabic) "الإعدادات" else "Settings",
                     isSelected = currentScreen == Screen.SETTINGS,
-                    accentColor = ElectricCyan,
+                    accentColor = NeonAmber,
                     onClick = { onSelectScreen(Screen.SETTINGS) },
                     testTag = "nav_settings"
                 )
@@ -307,32 +307,60 @@ private fun NavItem(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
 
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (isSelected) accentColor.copy(alpha = 0.2f) else Color.Transparent)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = ripple(bounded = true, color = accentColor),
-                onClick = onClick
-            )
-            .padding(horizontal = 8.dp, vertical = 6.dp)
-            .testTag(testTag),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    if (isSelected) {
+        // Active Pill (Bordered glow with icon and text, matching screenshots)
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(24.dp))
+                .background(accentColor.copy(alpha = 0.16f))
+                .border(
+                    BorderStroke(1.5.dp, accentColor),
+                    RoundedCornerShape(24.dp)
+                )
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = ripple(bounded = true, color = accentColor),
+                    onClick = onClick
+                )
+                .padding(horizontal = 14.dp, vertical = 8.dp)
+                .testTag(testTag),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = accentColor,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = label,
+                    color = accentColor,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    } else {
+        // Inactive Icon (Sleek and minimalist, matching screenshots)
+        Box(
+            modifier = Modifier
+                .clip(CircleShape)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = ripple(bounded = true, color = Color.White),
+                    onClick = onClick
+                )
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .testTag(testTag),
+            contentAlignment = Alignment.Center
+        ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = if (isSelected) accentColor else TextMuted,
+                tint = Color(0xFF64748B),
                 modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = label,
-                color = if (isSelected) accentColor else TextSecondary,
-                fontSize = 10.sp,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
             )
         }
     }
