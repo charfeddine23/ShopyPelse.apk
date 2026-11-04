@@ -30,11 +30,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CompareArrows
-import androidx.compose.material.icons.filled.ListAlt
+import androidx.compose.material.icons.automirrored.filled.CompareArrows
+import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -244,11 +243,11 @@ fun LiquidGlassBottomNavBar(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 NavItem(
-                    icon = Icons.Default.ListAlt,
+                    icon = Icons.AutoMirrored.Filled.ListAlt,
                     label = if (isArabic) "القائمة" else "List",
                     isSelected = currentScreen == Screen.HOME,
                     accentColor = ElectricCyan,
@@ -266,30 +265,12 @@ fun LiquidGlassBottomNavBar(
                 )
 
                 NavItem(
-                    icon = Icons.Default.CompareArrows,
+                    icon = Icons.AutoMirrored.Filled.CompareArrows,
                     label = if (isArabic) "الأسعار" else "Prices",
                     isSelected = currentScreen == Screen.PRICES,
                     accentColor = EmeraldSavings,
                     onClick = { onSelectScreen(Screen.PRICES) },
                     testTag = "nav_prices"
-                )
-
-                NavItem(
-                    icon = Icons.Default.ShoppingBag,
-                    label = if (isArabic) "المتجر" else "Shopping",
-                    isSelected = currentScreen == Screen.SUPERMARKET,
-                    accentColor = EmeraldSavings,
-                    onClick = { onSelectScreen(Screen.SUPERMARKET) },
-                    testTag = "nav_supermarket"
-                )
-
-                NavItem(
-                    icon = Icons.Default.Settings,
-                    label = if (isArabic) "الإعدادات" else "Settings",
-                    isSelected = currentScreen == Screen.SETTINGS,
-                    accentColor = NeonAmber,
-                    onClick = { onSelectScreen(Screen.SETTINGS) },
-                    testTag = "nav_settings"
                 )
             }
         }

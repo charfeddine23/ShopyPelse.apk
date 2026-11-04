@@ -74,6 +74,7 @@ import com.example.data.model.ShoppingItem
 import com.example.ui.components.GlowingActionButton
 import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.NeonBadge
+import com.example.ui.components.SwipeToDeleteContainer
 import com.example.ui.theme.BackgroundLight
 import com.example.ui.theme.CheckedGreen
 import com.example.ui.theme.CyanTintBg
@@ -219,16 +220,22 @@ fun HomeScreen(
                     items = filteredItems,
                     key = { it.id }
                 ) { item ->
-                    ShoppingItemRow(
-                        item = item,
-                        isArabic = isArabic,
-                        onToggleChecked = { viewModel.toggleChecked(item.id, !item.isChecked) },
-                        onIncrement = { viewModel.updateQuantity(item.id, 1) },
-                        onDecrement = { viewModel.updateQuantity(item.id, -1) },
+                    SwipeToDeleteContainer(
                         onDelete = { viewModel.deleteItem(item) },
-                        onItemClick = onNavigateToPriceComparison,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                    )
+                        isArabic = isArabic,
+                        deleteLabel = if (isArabic) "حذف" else "Delete",
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)
+                    ) {
+                        ShoppingItemRow(
+                            item = item,
+                            isArabic = isArabic,
+                            onToggleChecked = { viewModel.toggleChecked(item.id, !item.isChecked) },
+                            onIncrement = { viewModel.updateQuantity(item.id, 1) },
+                            onDecrement = { viewModel.updateQuantity(item.id, -1) },
+                            onDelete = { viewModel.deleteItem(item) },
+                            onItemClick = onNavigateToPriceComparison
+                        )
+                    }
                 }
             }
         }
@@ -305,20 +312,13 @@ private fun HomeHeader(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = if (isArabic) "شوبي بلس" else "ShopyPelse",
-                    color = TextPrimary,
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-0.5).sp
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                NeonBadge(
-                    text = "M5 GLASS",
-                    accentColor = ElectricCyan
-                )
-            }
+            Text(
+                text = if (isArabic) "شوبي بلس" else "ShopyPelse",
+                color = TextPrimary,
+                fontSize = 26.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = (-0.5).sp
+            )
             Text(
                 text = if (isArabic) "مقارنة الأسعار الذكية وقائمة التسوق" else "Smart Price Comparison & Shopping",
                 color = TextSecondary,
@@ -395,7 +395,7 @@ private fun HomeHeader(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (isArabic) "المتجر" else "Shop Mode",
+                        text = if (isArabic) "السلة" else "Cart",
                         color = shopPillContent,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold

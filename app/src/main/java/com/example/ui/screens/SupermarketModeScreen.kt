@@ -24,7 +24,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Edit
@@ -59,6 +59,7 @@ import com.example.data.model.ShoppingItem
 import com.example.ui.components.GlowingActionButton
 import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.NeonBadge
+import com.example.ui.components.SwipeToDeleteContainer
 import com.example.ui.theme.CheckedGreen
 import com.example.ui.theme.ElectricCyan
 import com.example.ui.theme.EmeraldSavings
@@ -241,16 +242,34 @@ fun SupermarketModeScreen(
                 }
             }
 
-            // High Contrast Aisle Items List
+            // Swipe hint
+            if (displayItems.isNotEmpty()) {
+                item {
+                    Text(
+                        text = if (isArabic) "👈 اسحب أي عنصر لحذفه من السلة" else "👉 Swipe any item to remove from cart",
+                        color = TextMuted,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            // High Contrast Aisle Items List with Swipe-to-Delete
             items(displayItems, key = { it.id }) { item ->
-                SupermarketItemCard(
-                    item = item,
+                SwipeToDeleteContainer(
+                    onDelete = { viewModel.deleteItem(item) },
                     isArabic = isArabic,
-                    onToggleChecked = { viewModel.toggleChecked(item.id, !item.isChecked) },
-                    onIncrement = { viewModel.updateQuantity(item.id, 1) },
-                    onDecrement = { viewModel.updateQuantity(item.id, -1) },
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                )
+                    deleteLabel = if (isArabic) "حذف من السلة" else "Remove from cart",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)
+                ) {
+                    SupermarketItemCard(
+                        item = item,
+                        isArabic = isArabic,
+                        onToggleChecked = { viewModel.toggleChecked(item.id, !item.isChecked) },
+                        onIncrement = { viewModel.updateQuantity(item.id, 1) },
+                        onDecrement = { viewModel.updateQuantity(item.id, -1) }
+                    )
+                }
             }
         }
 
@@ -401,7 +420,7 @@ private fun SupermarketModeHeader(
                     .testTag("supermarket_back_button")
             ) {
                 Icon(
-                    imageVector = Icons.Default.ArrowBack,
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
                     tint = TextPrimary
                 )

@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.CameraControl
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -15,6 +16,10 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -36,12 +41,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AddShoppingCart
+import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
-import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.Icon
@@ -107,22 +114,33 @@ fun ScannerScreen(
         hasCameraPermission = isGranted
     }
 
+    var cameraControl by remember { mutableStateOf<CameraControl?>(null) }
+    var isTorchOn by remember { mutableStateOf(false) }
+
     var scannedBarcode by remember { mutableStateOf("6130001000123") }
     var detectedPrices by remember { mutableStateOf<List<MarketPrice>>(emptyList()) }
     var scannedProductTitle by remember { mutableStateOf("Candia Viva Milk 1L") }
     var scannedProductTitleAr by remember { mutableStateOf("حليب كانديا فيفا 1 لتر") }
-    var isQrMode by remember { mutableStateOf(false) }
 
+    var isResultCardVisible by remember { mutableStateOf(true) }
+    var isItemAdded by remember { mutableStateOf(false) }
+    var showDemoPicker by remember { mutableStateOf(false) }
+
+    // When barcode changes, fetch matching prices
     LaunchedEffect(scannedBarcode, allMarketPrices) {
-        val prices = allMarketPrices.filter { it.barcode == scannedBarcode }
-        detectedPrices = prices
-        if (prices.isNotEmpty()) {
-            scannedProductTitle = prices.first().itemName
-            scannedProductTitleAr = prices.first().itemNameAr
+        if (scannedBarcode.isNotBlank()) {
+            val prices = allMarketPrices.filter { it.barcode == scannedBarcode }
+            detectedPrices = prices
+            if (prices.isNotEmpty()) {
+                scannedProductTitle = prices.first().itemName
+                scannedProductTitleAr = prices.first().itemNameAr
+                isResultCardVisible = true
+                isItemAdded = false
+            }
         }
     }
 
-    // Laser scan animation
+    // Smooth laser sweep animation
     val infiniteTransition = rememberInfiniteTransition(label = "laser_sweep")
     val laserOffset by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -134,8 +152,8 @@ fun ScannerScreen(
         label = "laser_anim"
     )
 
-    Box(modifier = modifier.fillMaxSize()) {
-        // Camera View or High-tech Simulation Background
+    Box(modifier = modifier.fillMaxSize().background(Color(0xFF070B12))) {
+        // 1. Camera Viewfinder or High-Tech Background
         if (hasCameraPermission) {
             AndroidView(
                 factory = { ctx ->
@@ -148,11 +166,12 @@ fun ScannerScreen(
                         }
                         try {
                             cameraProvider.unbindAll()
-                            cameraProvider.bindToLifecycle(
+                            val camera = cameraProvider.bindToLifecycle(
                                 lifecycleOwner,
                                 CameraSelector.DEFAULT_BACK_CAMERA,
                                 preview
                             )
+                            cameraControl = camera.cameraControl
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }
@@ -162,7 +181,7 @@ fun ScannerScreen(
                 modifier = Modifier.fillMaxSize()
             )
         } else {
-            // Futuristic Dark Camera Viewfinder with ambient cyber lines
+            // Dark futuristic background when camera permission not yet granted
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -170,121 +189,113 @@ fun ScannerScreen(
             )
         }
 
-        // Dark Vignette & Sci-Fi Overlay
+        // 2. Radial Vignette for immersive contrast
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.radialGradient(
-                        colors = listOf(Color.Transparent, Color(0xB3000000)),
-                        radius = 900f
+                        colors = listOf(Color.Transparent, Color(0xCC05080E)),
+                        radius = 850f
                     )
                 )
         )
 
-        // Top Bar
+        // 3. Top Action Bar & HUD
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp),
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Back Button
             IconButton(
                 onClick = onBack,
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(Color(0x66000000))
-                    .border(BorderStroke(1.dp, GlassBorder), CircleShape)
+                    .background(Color(0x80000000))
+                    .border(BorderStroke(1.dp, Color(0x33FFFFFF)), CircleShape)
                     .size(44.dp)
                     .testTag("scanner_back_button")
             ) {
                 Icon(
-                    imageVector = Icons.Default.ArrowBack,
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
                     tint = TextPrimary
                 )
             }
 
-            // Mode Selector Pill
+            // Title Pill
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
-                    .background(Color(0x80000000))
+                    .background(Color(0x990A111E))
                     .border(BorderStroke(1.dp, GlassBorder), RoundedCornerShape(20.dp))
-                    .padding(4.dp)
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(if (!isQrMode) ElectricCyan else Color.Transparent)
-                        .clickable { isQrMode = false }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = if (isArabic) "باركود المنتجات" else "Barcode",
-                        color = if (!isQrMode) Color(0xFF031422) else TextSecondary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(if (isQrMode) EmeraldSavings else Color.Transparent)
-                        .clickable { isQrMode = true }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = if (isArabic) "مسح قائمة QR" else "QR List",
-                        color = if (isQrMode) Color(0xFF021B10) else TextSecondary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.QrCodeScanner,
+                    contentDescription = null,
+                    tint = ElectricCyan,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (isArabic) "قارئ الباركود والأسعار" else "Price Scanner",
+                    color = TextPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
 
-            if (!hasCameraPermission) {
-                IconButton(
-                    onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .background(ElectricCyan.copy(alpha = 0.2f))
-                        .border(BorderStroke(1.dp, ElectricCyan), CircleShape)
-                        .size(44.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CameraAlt,
-                        contentDescription = "Camera Permission",
-                        tint = ElectricCyan
-                    )
-                }
-            } else {
-                Spacer(modifier = Modifier.size(44.dp))
+            // Flashlight / Torch Toggle Button
+            IconButton(
+                onClick = {
+                    if (hasCameraPermission && cameraControl != null) {
+                        val nextTorch = !isTorchOn
+                        cameraControl?.enableTorch(nextTorch)
+                        isTorchOn = nextTorch
+                    } else if (!hasCameraPermission) {
+                        permissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
+                },
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(if (isTorchOn) ElectricCyan else Color(0x80000000))
+                    .border(BorderStroke(1.dp, if (isTorchOn) ElectricCyan else Color(0x33FFFFFF)), CircleShape)
+                    .size(44.dp)
+                    .testTag("scanner_flashlight_button")
+            ) {
+                Icon(
+                    imageVector = if (isTorchOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                    contentDescription = "Flashlight",
+                    tint = if (isTorchOn) Color(0xFF041420) else TextPrimary
+                )
             }
         }
 
-        // Center Scanning Reticle Box
+        // 4. Center Scanning Reticle Box (Uncluttered)
         Box(
             modifier = Modifier
                 .align(Alignment.Center)
-                .size(280.dp)
+                .size(260.dp)
                 .testTag("scanner_reticle_box"),
             contentAlignment = Alignment.Center
         ) {
-            // Reticle Border & Corner brackets
+            // High-tech Corner Brackets
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .border(
-                        BorderStroke(1.5.dp, ElectricCyan.copy(alpha = 0.4f)),
-                        RoundedCornerShape(24.dp)
+                        BorderStroke(1.5.dp, ElectricCyan.copy(alpha = 0.35f)),
+                        RoundedCornerShape(22.dp)
                     )
                     .drawBehind {
-                        val bracketLen = 32.dp.toPx()
+                        val bracketLen = 30.dp.toPx()
                         val stroke = 4.dp.toPx()
-                        val color = ElectricCyan
+                        val color = if (isResultCardVisible) EmeraldSavings else ElectricCyan
 
                         // Top-left
                         drawLine(color, Offset(0f, 0f), Offset(bracketLen, 0f), stroke)
@@ -308,92 +319,200 @@ fun ScannerScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(2.dp)
-                    .offset(y = (-130 + (260 * laserOffset)).dp)
+                    .height(2.5.dp)
+                    .offset(y = (-120 + (240 * laserOffset)).dp)
                     .background(
                         Brush.horizontalGradient(
                             listOf(
                                 Color.Transparent,
-                                ElectricCyan.copy(alpha = 0.8f),
+                                (if (isResultCardVisible) EmeraldSavings else ElectricCyan).copy(alpha = 0.8f),
                                 Color.White,
-                                ElectricCyan.copy(alpha = 0.8f),
+                                (if (isResultCardVisible) EmeraldSavings else ElectricCyan).copy(alpha = 0.8f),
                                 Color.Transparent
                             )
                         )
                     )
             )
 
-            // Target Crosshair Center
+            // Center Target Crosshair
             Box(
                 modifier = Modifier
-                    .size(16.dp)
-                    .border(BorderStroke(1.dp, ElectricCyan.copy(alpha = 0.6f)), CircleShape)
+                    .size(14.dp)
+                    .border(BorderStroke(1.dp, ElectricCyan.copy(alpha = 0.5f)), CircleShape)
             )
         }
 
-        // Fast Test Barcode Carousel (For instant barcode verification & testing in any environment)
-        Column(
+        // 5. Minimalist Scanning Instructions Pill (Shown when no result is covering)
+        if (!isResultCardVisible) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset(y = 160.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xCC0A111E))
+                    .border(BorderStroke(1.dp, Color(0x33475569)), RoundedCornerShape(16.dp))
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = if (isArabic) "ضع الباركود داخل الإطار للمقارنة الفورية" else "Align barcode inside frame to compare",
+                    color = TextSecondary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+
+        // 6. Camera Permission Warning Card (if not granted)
+        if (!hasCameraPermission) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(24.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0xEE0F172A))
+                    .border(BorderStroke(1.dp, ElectricCyan), RoundedCornerShape(20.dp))
+                    .padding(20.dp)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Default.CameraAlt,
+                        contentDescription = null,
+                        tint = ElectricCyan,
+                        modifier = Modifier.size(36.dp)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = if (isArabic) "إذن الكاميرا مطلوب للمسح" else "Camera Permission Required",
+                        color = TextPrimary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = if (isArabic) "اسمح للتطبيق باستخدام الكاميرا لمسح الباركود في المتاجر." else "Grant camera access to scan barcodes and compare prices.",
+                        color = TextSecondary,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    GlowingActionButton(
+                        text = if (isArabic) "تفعيل الكاميرا" else "Enable Camera",
+                        icon = Icons.Default.CameraAlt,
+                        color = ElectricCyan,
+                        onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }
+                    )
+                }
+            }
+        }
+
+        // 7. Compact Demo Trigger Button (Small, clean floating pill at bottom)
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(bottom = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(bottom = if (isResultCardVisible) 270.dp else 24.dp)
         ) {
-            Text(
-                text = if (isArabic) "اختر نموذج باركود للاختبار السريع:" else "Tap sample barcode to simulate live scan:",
-                color = TextSecondary,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(bottom = 6.dp)
-            )
-
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color(0xDD0A111E))
+                    .border(BorderStroke(1.dp, if (showDemoPicker) ElectricCyan else Color(0x33FFFFFF)), RoundedCornerShape(24.dp))
+                    .clickable { showDemoPicker = !showDemoPicker }
+                    .padding(horizontal = 14.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                val samples = listOf(
-                    Triple("6130001000123", "Candia Viva", "حليب كانديا"),
-                    Triple("6130002000456", "Elio Oil 5L", "زيت إيليو"),
-                    Triple("6130003000789", "Famico Coffee", "قهوة فاميكو"),
-                    Triple("6130004000111", "Cab Tomato", "طماطم كاب"),
-                    Triple("6130010000777", "Farm Eggs 30", "بيض 30 حبة"),
-                    Triple("6130007000444", "Isis 3kg", "إيزيس 3 كغ")
+                Icon(
+                    imageVector = Icons.Default.AutoFixHigh,
+                    contentDescription = null,
+                    tint = ElectricCyan,
+                    modifier = Modifier.size(16.dp)
                 )
-                items(samples) { (barcode, enName, arName) ->
-                    val isSelected = scannedBarcode == barcode
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (isSelected) ElectricCyan else Color(0x66000000))
-                            .border(BorderStroke(1.dp, if (isSelected) ElectricCyan else GlassBorder), RoundedCornerShape(12.dp))
-                            .clickable { scannedBarcode = barcode }
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = if (isArabic) arName else enName,
-                            color = if (isSelected) Color(0xFF041420) else TextPrimary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (isArabic) "تجربة منتج عشوائي" else "Try Sample Product",
+                    color = ElectricCyan,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+
+        // Demo Picker Chips Overlay (Opens cleanly only on request)
+        if (showDemoPicker) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = if (isResultCardVisible) 310.dp else 68.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xF00A111E))
+                    .border(BorderStroke(1.dp, ElectricCyan.copy(alpha = 0.5f)), RoundedCornerShape(16.dp))
+                    .padding(10.dp)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = if (isArabic) "اختر منتجاً للمحاكاة الفورية:" else "Select sample to simulate:",
+                        color = TextMuted,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                    val demoSamples = listOf(
+                        Triple("6130001000123", "Candia Milk", "حليب كانديا"),
+                        Triple("6130002000456", "Elio Oil 5L", "زيت إيليو"),
+                        Triple("6130003000789", "Famico Coffee", "قهوة فاميكو"),
+                        Triple("6130004000111", "Cab Tomato", "طماطم كاب"),
+                        Triple("6130010000777", "Farm Eggs 30", "بيض 30 حبة")
+                    )
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(demoSamples) { (barcode, enName, arName) ->
+                            val isSelected = scannedBarcode == barcode
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) ElectricCyan else Color(0x33FFFFFF))
+                                    .clickable {
+                                        scannedBarcode = barcode
+                                        showDemoPicker = false
+                                        isResultCardVisible = true
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = if (isArabic) arName else enName,
+                                    color = if (isSelected) Color(0xFF041420) else TextPrimary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
                     }
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.height(10.dp))
+        // 8. Elegant Result Sheet (Slides up cleanly from bottom when product is detected)
+        AnimatedVisibility(
+            visible = isResultCardVisible,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+        ) {
+            val minPrice = detectedPrices.minByOrNull { it.priceDzd }?.priceDzd ?: 0.0
+            val bestStore = detectedPrices.minByOrNull { it.priceDzd }
 
-            // Scanned Product Details Liquid Glass Card
             LiquidGlassCard(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
                     .testTag("scanned_result_card"),
                 glowColor = EmeraldSavings
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
+                    // Header: Product Title, Barcode, and Dismiss Button
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.Top
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -404,7 +523,7 @@ fun ScannerScreen(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 NeonBadge(
-                                    text = if (isArabic) "متحقق منه" else "VERIFIED",
+                                    text = if (isArabic) "تم العثور عليه" else "MATCH FOUND",
                                     accentColor = EmeraldSavings
                                 )
                             }
@@ -412,86 +531,154 @@ fun ScannerScreen(
                             Text(
                                 text = if (isArabic) scannedProductTitleAr else scannedProductTitle,
                                 color = TextPrimary,
-                                fontSize = 16.sp,
+                                fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
 
-                        // Add to list button
+                        // Close / Dismiss Button to continue scanning
+                        IconButton(
+                            onClick = { isResultCardVisible = false },
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(Color(0x22FFFFFF))
+                                .size(32.dp)
+                                .testTag("close_scanned_card_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close",
+                                tint = TextSecondary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Best Price Highlight Box
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0x2200E676))
+                            .border(BorderStroke(1.dp, EmeraldSavings.copy(alpha = 0.5f)), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = if (isArabic) "أفضل سعر متاح الآن:" else "Lowest price detected:",
+                                    color = TextSecondary,
+                                    fontSize = 11.sp
+                                )
+                                Text(
+                                    text = if (isArabic) (bestStore?.storeNameAr ?: "") else (bestStore?.storeName ?: ""),
+                                    color = TextPrimary,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Text(
+                                text = LocalizationUtil.formatDzd(minPrice, isArabic),
+                                color = EmeraldSavings,
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Store Comparison Horizontal Chips (Clean & compact, non-messy)
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(detectedPrices) { price ->
+                            val isCheapest = price.priceDzd == minPrice
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isCheapest) EmeraldSavings.copy(alpha = 0.15f) else Color(0x15FFFFFF))
+                                    .border(
+                                        BorderStroke(1.dp, if (isCheapest) EmeraldSavings else Color(0x22FFFFFF)),
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Storefront,
+                                    contentDescription = null,
+                                    tint = if (isCheapest) EmeraldSavings else TextSecondary,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (isArabic) price.storeNameAr else price.storeName,
+                                    color = TextPrimary,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isCheapest) FontWeight.Bold else FontWeight.Normal
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = LocalizationUtil.formatDzd(price.priceDzd, isArabic),
+                                    color = if (isCheapest) EmeraldSavings else TextSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Action Button: Add to Cart / Shopping List
+                    if (!isItemAdded) {
                         GlowingActionButton(
-                            text = if (isArabic) "إضافة" else "Add",
-                            icon = Icons.Default.Add,
+                            text = if (isArabic) "إضافة إلى سلة التسوق" else "Add to Shopping Basket",
+                            icon = Icons.Default.AddShoppingCart,
                             color = EmeraldSavings,
                             onClick = {
-                                val minPrice = detectedPrices.minByOrNull { it.priceDzd }?.priceDzd ?: 0.0
                                 viewModel.addItem(
                                     name = scannedProductTitle,
                                     nameAr = scannedProductTitleAr,
                                     barcode = scannedBarcode,
                                     estimatedPriceDzd = minPrice
                                 )
-                            }
+                                isItemAdded = true
+                            },
+                            modifier = Modifier.fillMaxWidth()
                         )
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Store Price Comparison Row
-                    Text(
-                        text = if (isArabic) "الأسعار في المتاجر المجاورة:" else "Prices in Nearby Stores:",
-                        color = TextSecondary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        val minPrice = detectedPrices.minByOrNull { it.priceDzd }?.priceDzd ?: 0.0
-                        detectedPrices.forEach { price ->
-                            val isCheapest = price.priceDzd == minPrice
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isCheapest) Color(0x2200E676) else Color(0x15FFFFFF))
-                                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Storefront,
-                                        contentDescription = null,
-                                        tint = if (isCheapest) EmeraldSavings else TextSecondary,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = if (isArabic) price.storeNameAr else price.storeName,
-                                        color = TextPrimary,
-                                        fontSize = 12.sp,
-                                        fontWeight = if (isCheapest) FontWeight.Bold else FontWeight.Normal
-                                    )
-                                }
-
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (isCheapest) {
-                                        Text(
-                                            text = if (isArabic) "الأرخص" else "Best",
-                                            color = EmeraldSavings,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(end = 6.dp)
-                                        )
-                                    }
-                                    Text(
-                                        text = LocalizationUtil.formatDzd(price.priceDzd, isArabic),
-                                        color = if (isCheapest) EmeraldSavings else TextPrimary,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color(0x3300E676))
+                                .border(BorderStroke(1.dp, EmeraldSavings), RoundedCornerShape(16.dp))
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = EmeraldSavings,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isArabic) "تمت الإضافة إلى سلتك بنجاح!" else "Added to your basket!",
+                                    color = EmeraldSavings,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
                     }
