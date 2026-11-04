@@ -117,12 +117,12 @@ fun ScannerScreen(
     var cameraControl by remember { mutableStateOf<CameraControl?>(null) }
     var isTorchOn by remember { mutableStateOf(false) }
 
-    var scannedBarcode by remember { mutableStateOf("6130001000123") }
+    var scannedBarcode by remember { mutableStateOf("") }
     var detectedPrices by remember { mutableStateOf<List<MarketPrice>>(emptyList()) }
-    var scannedProductTitle by remember { mutableStateOf("Candia Viva Milk 1L") }
-    var scannedProductTitleAr by remember { mutableStateOf("حليب كانديا فيفا 1 لتر") }
+    var scannedProductTitle by remember { mutableStateOf("") }
+    var scannedProductTitleAr by remember { mutableStateOf("") }
 
-    var isResultCardVisible by remember { mutableStateOf(true) }
+    var isResultCardVisible by remember { mutableStateOf(false) }
     var isItemAdded by remember { mutableStateOf(false) }
     var showDemoPicker by remember { mutableStateOf(false) }
 
@@ -137,6 +137,11 @@ fun ScannerScreen(
                 isResultCardVisible = true
                 isItemAdded = false
             }
+        } else {
+            isResultCardVisible = false
+            detectedPrices = emptyList()
+            scannedProductTitle = ""
+            scannedProductTitleAr = ""
         }
     }
 
@@ -539,7 +544,12 @@ fun ScannerScreen(
 
                         // Close / Dismiss Button to continue scanning
                         IconButton(
-                            onClick = { isResultCardVisible = false },
+                            onClick = {
+                                isResultCardVisible = false
+                                scannedBarcode = ""
+                                detectedPrices = emptyList()
+                                isItemAdded = false
+                            },
                             modifier = Modifier
                                 .clip(CircleShape)
                                 .background(Color(0x22FFFFFF))

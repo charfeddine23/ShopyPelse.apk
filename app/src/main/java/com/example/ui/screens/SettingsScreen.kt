@@ -202,16 +202,14 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             LanguageOptionPill(
-                                title = "العربية (RTL)",
-                                subtitle = "الافتراضية بالدينار الجزائري",
+                                title = "Arabic",
                                 isSelected = isArabic,
                                 onClick = { viewModel.setLanguage(true) },
                                 modifier = Modifier.weight(1f)
                             )
 
                             LanguageOptionPill(
-                                title = "English (LTR)",
-                                subtitle = "Standard Latin Layout",
+                                title = "English",
                                 isSelected = !isArabic,
                                 onClick = { viewModel.setLanguage(false) },
                                 modifier = Modifier.weight(1f)
@@ -696,7 +694,6 @@ private fun SettingsSectionHeader(
 @Composable
 private fun LanguageOptionPill(
     title: String,
-    subtitle: String,
     isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -724,22 +721,15 @@ private fun LanguageOptionPill(
             .background(pillBg)
             .border(pillBorder, RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .padding(12.dp)
+            .padding(vertical = 12.dp, horizontal = 16.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Column {
-            Text(
-                text = title,
-                color = titleColor,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = subtitle,
-                color = TextSecondary,
-                fontSize = 10.sp
-            )
-        }
+        Text(
+            text = title,
+            color = titleColor,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
