@@ -32,7 +32,7 @@ jobs:
             chmod +x gradlew
           fi
 
-      - name: Extract Version Info from Gradle
+      - name: Extract Version Info & Prevent Tag Collision
         id: extract_version
         run: |
           VERSION_NAME=$(grep -E '^\s*versionName\s*=\s*' app/build.gradle.kts | head -1 | sed -E 's/.*versionName\s*=\s*"([^"]+)".*/\1/')
@@ -45,10 +45,18 @@ jobs:
             VERSION_CODE="1"
           fi
           
+          # Prevent duplicate tag collisions if re-running or updating existing version
+          BASE_TAG="v$VERSION_NAME"
+          if git rev-parse -q --verify "refs/tags/$BASE_TAG" >/dev/null 2>&1; then
+            FINAL_TAG="v${VERSION_NAME}-b${VERSION_CODE}.${{ github.run_number }}"
+          else
+            FINAL_TAG="$BASE_TAG"
+          fi
+          
           echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
           echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
-          echo "TAG_NAME=v$VERSION_NAME" >> $GITHUB_ENV
-          echo "Extracted Version: $VERSION_NAME (Build $VERSION_CODE)"
+          echo "TAG_NAME=$FINAL_TAG" >> $GITHUB_ENV
+          echo "Resolved Version: $VERSION_NAME (Build $VERSION_CODE) -> Tag: $FINAL_TAG"
 
       - name: Prepare Signing Keystore
         id: prepare_keystore
@@ -59,16 +67,19 @@ jobs:
             echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > "$KEYSTORE_FILE"
             echo "STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
             echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
+            echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> $GITHUB_ENV
           elif [ -f "${{ github.workspace }}/my-upload-key.jks" ]; then
             echo "Using existing repository my-upload-key.jks..."
             KEYSTORE_FILE="${{ github.workspace }}/my-upload-key.jks"
             echo "STORE_PASSWORD=android" >> $GITHUB_ENV
             echo "KEY_PASSWORD=android" >> $GITHUB_ENV
+            echo "KEY_ALIAS=upload" >> $GITHUB_ENV
           else
-            echo "Generating automatic production signing key..."
+            echo "Generating automatic signing key fallback..."
             keytool -genkeypair -v -keystore "$KEYSTORE_FILE" -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=ShopyPelse, OU=Mobile, O=ShopyPelse, L=Algiers, ST=Algiers, C=DZ"
             echo "STORE_PASSWORD=android" >> $GITHUB_ENV
             echo "KEY_PASSWORD=android" >> $GITHUB_ENV
+            echo "KEY_ALIAS=upload" >> $GITHUB_ENV
           fi
           echo "KEYSTORE_PATH=$KEYSTORE_FILE" >> $GITHUB_ENV
 
@@ -77,7 +88,7 @@ jobs:
           KEYSTORE_PATH: ${{ env.KEYSTORE_PATH }}
           STORE_PASSWORD: ${{ env.STORE_PASSWORD }}
           KEY_PASSWORD: ${{ env.KEY_PASSWORD }}
-          KEY_ALIAS: upload
+          KEY_ALIAS: ${{ env.KEY_ALIAS }}
           JAVA_OPTS: "-Djava.awt.headless=true"
           GRADLE_OPTS: "-Djava.awt.headless=true -Dorg.gradle.daemon=false"
         run: |
@@ -105,24 +116,29 @@ jobs:
         with:
           tag_name: ${{ env.TAG_NAME }}
           name: "ShopyPelse v${{ env.VERSION_NAME }} (Build ${{ env.VERSION_CODE }})"
+          make_latest: true
           body: |
             ### 🚀 ShopyPelse v${{ env.VERSION_NAME }} Release
             
-            **What's New:**
-            - Automated Production Release APK: `ShopyPelse-v${{ env.VERSION_NAME }}.apk`
-            - Built from commit `${{ github.sha }}` on branch `main`
-            - Liquid Glass M5 Dark Mode Aesthetics
-            - Smart Offline Shopping List & Auto-Categorization
-            - Barcode & QR Code Scanner with In-Store Price Verification
-            - Total Basket Price Comparison with Best Value Detection
-            - Supermarket Mode with Live Budget Tracking HUD
-            - Settings Screen: Language (Arabic/English), Dark/Light Mode, Google Drive Backup & Restore
-            - Developed by Charfeddine Ka
+            **Build Details:**
+            - **Release Artifact:** `ShopyPelse-v${{ env.VERSION_NAME }}.apk`
+            - **Version Name:** `${{ env.VERSION_NAME }}`
+            - **Version Code:** `${{ env.VERSION_CODE }}`
+            - **Commit SHA:** `${{ github.sha }}`
+            - **Trigger Branch:** `${{ github.ref_name }}`
+            - **Author / Lead:** Developed by Charfeddine Ka
             
-            #### 📲 Installation Instructions:
-            1. Download the attached `ShopyPelse-v${{ env.VERSION_NAME }}.apk` below.
-            2. Open the APK on your Android device (ensure "Install from unknown sources" is enabled if prompted).
-            3. Existing installations will update seamlessly in place without data loss.
+            **Key Features Included:**
+            - 🛒 Smart Shopping List with auto-categorization & offline Room DB
+            - 🔍 In-store Barcode & QR Code price verification scanner
+            - 📊 Total Basket multi-market price comparison
+            - ⚡ Supermarket Mode with live budget HUD & real-time progress
+            - ⚙️ Settings: Dark/Light Mode, Language switch (Arabic RTL / English LTR), Google Drive backup
+            
+            #### 📲 Installation & Update Instructions:
+            1. Download the `ShopyPelse-v${{ env.VERSION_NAME }}.apk` file attached below.
+            2. Open the APK on your Android device.
+            3. This release will update directly over your existing installation without losing any shopping lists or data.
           files: ShopyPelse-v${{ env.VERSION_NAME }}.apk
           draft: false
           prerelease: false
