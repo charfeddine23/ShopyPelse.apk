@@ -448,30 +448,70 @@ fun SettingsScreen(
 
                         Spacer(modifier = Modifier.height(14.dp))
 
-                        // Action Buttons: Backup & Restore
+                        // Compact & Harmonious Action Buttons: Backup & Restore
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            GlowingActionButton(
-                                text = if (isArabic) "نسخ احتياطي للـ Drive" else "Backup to Drive",
-                                icon = Icons.Default.CloudUpload,
-                                color = EmeraldSavings,
-                                onClick = {
-                                    createDocLauncher.launch("ShopyPelse_Backup_${System.currentTimeMillis()}.json")
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
+                            // Backup Button
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(EmeraldSavings.copy(alpha = 0.18f))
+                                    .border(BorderStroke(1.dp, EmeraldSavings), RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        createDocLauncher.launch("ShopyPelse_Backup_${System.currentTimeMillis()}.json")
+                                    }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.CloudUpload,
+                                        contentDescription = null,
+                                        tint = EmeraldSavings,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Backup",
+                                        color = EmeraldSavings,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
 
-                            GlowingActionButton(
-                                text = if (isArabic) "استعادة من Drive" else "Restore from Drive",
-                                icon = Icons.Default.CloudDownload,
-                                color = ElectricCyan,
-                                onClick = {
-                                    openDocLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
+                            // Restore Button
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(ElectricCyan.copy(alpha = 0.18f))
+                                    .border(BorderStroke(1.dp, ElectricCyan), RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        openDocLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+                                    }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.CloudDownload,
+                                        contentDescription = null,
+                                        tint = ElectricCyan,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Restore",
+                                        color = ElectricCyan,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(10.dp))

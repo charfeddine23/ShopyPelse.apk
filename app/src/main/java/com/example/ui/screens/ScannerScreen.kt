@@ -276,146 +276,17 @@ fun ScannerScreen(
             }
         }
 
-        // 4. Center Scanning Reticle Box (Uncluttered)
+        // 4. Random / Sample Product Scan Feature - Positioned right ABOVE the barcode reticle
         Box(
             modifier = Modifier
                 .align(Alignment.Center)
-                .size(260.dp)
-                .testTag("scanner_reticle_box"),
-            contentAlignment = Alignment.Center
-        ) {
-            // High-tech Corner Brackets
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .border(
-                        BorderStroke(1.5.dp, ElectricCyan.copy(alpha = 0.35f)),
-                        RoundedCornerShape(22.dp)
-                    )
-                    .drawBehind {
-                        val bracketLen = 30.dp.toPx()
-                        val stroke = 4.dp.toPx()
-                        val color = if (isResultCardVisible) EmeraldSavings else ElectricCyan
-
-                        // Top-left
-                        drawLine(color, Offset(0f, 0f), Offset(bracketLen, 0f), stroke)
-                        drawLine(color, Offset(0f, 0f), Offset(0f, bracketLen), stroke)
-
-                        // Top-right
-                        drawLine(color, Offset(size.width, 0f), Offset(size.width - bracketLen, 0f), stroke)
-                        drawLine(color, Offset(size.width, 0f), Offset(size.width, bracketLen), stroke)
-
-                        // Bottom-left
-                        drawLine(color, Offset(0f, size.height), Offset(bracketLen, size.height), stroke)
-                        drawLine(color, Offset(0f, size.height), Offset(0f, size.height - bracketLen), stroke)
-
-                        // Bottom-right
-                        drawLine(color, Offset(size.width, size.height), Offset(size.width - bracketLen, size.height), stroke)
-                        drawLine(color, Offset(size.width, size.height), Offset(size.width, size.height - bracketLen), stroke)
-                    }
-            )
-
-            // Animated Laser Sweep Line
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(2.5.dp)
-                    .offset(y = (-120 + (240 * laserOffset)).dp)
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                Color.Transparent,
-                                (if (isResultCardVisible) EmeraldSavings else ElectricCyan).copy(alpha = 0.8f),
-                                Color.White,
-                                (if (isResultCardVisible) EmeraldSavings else ElectricCyan).copy(alpha = 0.8f),
-                                Color.Transparent
-                            )
-                        )
-                    )
-            )
-
-            // Center Target Crosshair
-            Box(
-                modifier = Modifier
-                    .size(14.dp)
-                    .border(BorderStroke(1.dp, ElectricCyan.copy(alpha = 0.5f)), CircleShape)
-            )
-        }
-
-        // 5. Minimalist Scanning Instructions Pill (Shown when no result is covering)
-        if (!isResultCardVisible) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .offset(y = 160.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xCC0A111E))
-                    .border(BorderStroke(1.dp, Color(0x33475569)), RoundedCornerShape(16.dp))
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                Text(
-                    text = if (isArabic) "ضع الباركود داخل الإطار للمقارنة الفورية" else "Align barcode inside frame to compare",
-                    color = TextSecondary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        }
-
-        // 6. Camera Permission Warning Card (if not granted)
-        if (!hasCameraPermission) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(24.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color(0xEE0F172A))
-                    .border(BorderStroke(1.dp, ElectricCyan), RoundedCornerShape(20.dp))
-                    .padding(20.dp)
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Default.CameraAlt,
-                        contentDescription = null,
-                        tint = ElectricCyan,
-                        modifier = Modifier.size(36.dp)
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = if (isArabic) "إذن الكاميرا مطلوب للمسح" else "Camera Permission Required",
-                        color = TextPrimary,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = if (isArabic) "اسمح للتطبيق باستخدام الكاميرا لمسح الباركود في المتاجر." else "Grant camera access to scan barcodes and compare prices.",
-                        color = TextSecondary,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-                    GlowingActionButton(
-                        text = if (isArabic) "تفعيل الكاميرا" else "Enable Camera",
-                        icon = Icons.Default.CameraAlt,
-                        color = ElectricCyan,
-                        onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }
-                    )
-                }
-            }
-        }
-
-        // 7. Compact Demo Trigger Button (Small, clean floating pill at bottom)
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = if (isResultCardVisible) 270.dp else 24.dp)
+                .offset(y = (-230).dp)
         ) {
             Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(Color(0xDD0A111E))
-                    .border(BorderStroke(1.dp, if (showDemoPicker) ElectricCyan else Color(0x33FFFFFF)), RoundedCornerShape(24.dp))
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0xD90A111E))
+                    .border(BorderStroke(1.dp, if (showDemoPicker) ElectricCyan else Color(0x4038BDF8)), RoundedCornerShape(20.dp))
                     .clickable { showDemoPicker = !showDemoPicker }
                     .padding(horizontal = 14.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -424,28 +295,28 @@ fun ScannerScreen(
                     imageVector = Icons.Default.AutoFixHigh,
                     contentDescription = null,
                     tint = ElectricCyan,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(15.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = if (isArabic) "تجربة منتج عشوائي" else "Try Sample Product",
                     color = ElectricCyan,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
 
-        // Demo Picker Chips Overlay (Opens cleanly only on request)
+        // Demo Picker Chips (Appears smoothly above reticle when clicked)
         if (showDemoPicker) {
             Box(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = if (isResultCardVisible) 310.dp else 68.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .align(Alignment.Center)
+                    .offset(y = (-275).dp)
+                    .clip(RoundedCornerShape(14.dp))
                     .background(Color(0xF00A111E))
-                    .border(BorderStroke(1.dp, ElectricCyan.copy(alpha = 0.5f)), RoundedCornerShape(16.dp))
-                    .padding(10.dp)
+                    .border(BorderStroke(1.dp, ElectricCyan.copy(alpha = 0.5f)), RoundedCornerShape(14.dp))
+                    .padding(8.dp)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
@@ -484,6 +355,136 @@ fun ScannerScreen(
                             }
                         }
                     }
+                }
+            }
+        }
+
+        // 5. Center Scanning Reticle Box (Lifted Upward for generous bottom space)
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .offset(y = (-85).dp)
+                .size(240.dp)
+                .testTag("scanner_reticle_box"),
+            contentAlignment = Alignment.Center
+        ) {
+            // High-tech Corner Brackets
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .border(
+                        BorderStroke(1.5.dp, ElectricCyan.copy(alpha = 0.35f)),
+                        RoundedCornerShape(22.dp)
+                    )
+                    .drawBehind {
+                        val bracketLen = 28.dp.toPx()
+                        val stroke = 4.dp.toPx()
+                        val color = if (isResultCardVisible) EmeraldSavings else ElectricCyan
+
+                        // Top-left
+                        drawLine(color, Offset(0f, 0f), Offset(bracketLen, 0f), stroke)
+                        drawLine(color, Offset(0f, 0f), Offset(0f, bracketLen), stroke)
+
+                        // Top-right
+                        drawLine(color, Offset(size.width, 0f), Offset(size.width - bracketLen, 0f), stroke)
+                        drawLine(color, Offset(size.width, 0f), Offset(size.width, bracketLen), stroke)
+
+                        // Bottom-left
+                        drawLine(color, Offset(0f, size.height), Offset(bracketLen, size.height), stroke)
+                        drawLine(color, Offset(0f, size.height), Offset(0f, size.height - bracketLen), stroke)
+
+                        // Bottom-right
+                        drawLine(color, Offset(size.width, size.height), Offset(size.width - bracketLen, size.height), stroke)
+                        drawLine(color, Offset(size.width, size.height), Offset(size.width, size.height - bracketLen), stroke)
+                    }
+            )
+
+            // Animated Laser Sweep Line
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.5.dp)
+                    .offset(y = (-110 + (220 * laserOffset)).dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                Color.Transparent,
+                                (if (isResultCardVisible) EmeraldSavings else ElectricCyan).copy(alpha = 0.8f),
+                                Color.White,
+                                (if (isResultCardVisible) EmeraldSavings else ElectricCyan).copy(alpha = 0.8f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+
+            // Center Target Crosshair
+            Box(
+                modifier = Modifier
+                    .size(14.dp)
+                    .border(BorderStroke(1.dp, ElectricCyan.copy(alpha = 0.5f)), CircleShape)
+            )
+        }
+
+        // 6. Minimalist Scanning Instructions Pill (Positioned neatly under the lifted reticle)
+        if (!isResultCardVisible) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset(y = 65.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xCC0A111E))
+                    .border(BorderStroke(1.dp, Color(0x33475569)), RoundedCornerShape(16.dp))
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = if (isArabic) "ضع الباركود داخل الإطار للمقارنة الفورية" else "Align barcode inside frame to compare",
+                    color = TextSecondary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+
+        // 7. Camera Permission Warning Card (if not granted)
+        if (!hasCameraPermission) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(24.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0xEE0F172A))
+                    .border(BorderStroke(1.dp, ElectricCyan), RoundedCornerShape(20.dp))
+                    .padding(20.dp)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Default.CameraAlt,
+                        contentDescription = null,
+                        tint = ElectricCyan,
+                        modifier = Modifier.size(36.dp)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = if (isArabic) "إذن الكاميرا مطلوب للمسح" else "Camera Permission Required",
+                        color = TextPrimary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = if (isArabic) "اسمح للتطبيق باستخدام الكاميرا لمسح الباركود في المتاجر." else "Grant camera access to scan barcodes and compare prices.",
+                        color = TextSecondary,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    GlowingActionButton(
+                        text = if (isArabic) "تفعيل الكاميرا" else "Enable Camera",
+                        icon = Icons.Default.CameraAlt,
+                        color = ElectricCyan,
+                        onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }
+                    )
                 }
             }
         }
