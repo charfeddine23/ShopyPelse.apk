@@ -1,7 +1,8 @@
 package com.example
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import com.example.ui.BaseActivity
+import com.example.util.LocaleHelper
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -88,7 +89,7 @@ enum class Screen {
     SETTINGS
 }
 
-class MainActivity : ComponentActivity() {
+class MainActivity : BaseActivity() {
 
     private lateinit var viewModel: ShoppingViewModel
 
@@ -105,6 +106,9 @@ class MainActivity : ComponentActivity() {
             val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
             val isArabic by viewModel.isArabic.collectAsStateWithLifecycle()
             val layoutDirection = if (isArabic) LayoutDirection.Rtl else LayoutDirection.Ltr
+
+            // Also synchronize native window decorView for system dialogs/popups
+            syncDecorViewLayoutDirection()
 
             ShopyPelseTheme(darkTheme = isDarkMode) {
                 CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {

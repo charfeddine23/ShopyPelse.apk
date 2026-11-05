@@ -81,6 +81,18 @@ import com.example.ui.theme.TextSecondary
 import com.example.ui.viewmodel.ShoppingViewModel
 import com.example.util.LocalizationUtil
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.ui.draw.rotate
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
 @Composable
 fun PriceComparisonScreen(
     viewModel: ShoppingViewModel,
@@ -91,6 +103,9 @@ fun PriceComparisonScreen(
     val allPrices by viewModel.marketPrices.collectAsStateWithLifecycle()
     val basketSummaries by viewModel.basketSummaries.collectAsStateWithLifecycle()
     val shoppingItems by viewModel.shoppingItems.collectAsStateWithLifecycle()
+    val lastSyncTime by viewModel.lastPriceSyncTimestamp.collectAsStateWithLifecycle()
+    val isSyncingPrices by viewModel.isSyncingPrices.collectAsStateWithLifecycle()
+    val updatedCount by viewModel.updatedItemsCount.collectAsStateWithLifecycle()
 
     var searchQuery by remember { mutableStateOf("") }
     var reportItemDialog by remember { mutableStateOf<MarketPrice?>(null) }
@@ -196,38 +211,55 @@ fun PriceComparisonScreen(
                 )
             }
 
-            // Total Basket Price Comparison Section
+            // 12-Hour Automated Essential Product Price Sync Card
             item {
-                TotalBasketSection(
-                    summaries = basketSummaries,
+                AutoPriceSyncCard(
+                    lastSyncTime = lastSyncTime,
+                    isSyncing = isSyncingPrices,
                     isArabic = isArabic,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                    onManualRefresh = { viewModel.refreshEssentialPrices() },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                 )
             }
 
-            // Section Title
+            // Section Title: 1000 Products Catalog & Price list
             item {
-                Text(
-                    text = if (isArabic) "مقارنة أسعار المنتجات حسب المتجر" else "Item-by-Item Store Comparison",
-                    color = TextPrimary,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isArabic) "قائمة المنتجات والأسعار المباشرة" else "Direct Products & Prices Catalog",
+                        color = TextPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    NeonBadge(
+                        text = if (isArabic) "${groupedProducts.size} منتج" else "${groupedProducts.size} Products",
+                        accentColor = ElectricCyan
+                    )
+                }
             }
 
-            // Grouped Product Cards
+            // Products Listed Under Each Other (Name + Direct Price)
             items(groupedProducts.entries.toList(), key = { it.key }) { entry ->
                 val prices = entry.value
                 val first = prices.first()
-                ProductPriceMatrixCard(
+                val minPrice = prices.minOfOrNull { it.priceDzd } ?: first.priceDzd
+
+                DirectProductPriceItem(
                     barcode = entry.key,
                     itemName = first.itemName,
                     itemNameAr = first.itemNameAr,
-                    prices = prices,
+                    storeName = first.storeName,
+                    storeNameAr = first.storeNameAr,
+                    priceDzd = minPrice,
                     isArabic = isArabic,
-                    onReportPrice = { reportItemDialog = it },
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                    onEditPrice = { reportItemDialog = first },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                 )
             }
         }
@@ -251,6 +283,234 @@ fun PriceComparisonScreen(
                 reportItemDialog = null
             }
         )
+    }
+}
+
+@Composable
+private fun AutoPriceSyncCard(
+    lastSyncTime: Long,
+    isSyncing: Boolean,
+    isArabic: Boolean,
+    onManualRefresh: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+    val infiniteTransition = rememberInfiniteTransition(label = "sync_rotation")
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1000, easing = LinearEasing)
+        ),
+        label = "rotation"
+    )
+
+    val dateFormat = remember(isArabic) {
+        val locale = if (isArabic) Locale("ar") else Locale.ENGLISH
+        SimpleDateFormat("HH:mm - dd/MM", locale)
+    }
+    val timeFormatted = remember(lastSyncTime, dateFormat) {
+        dateFormat.format(Date(lastSyncTime))
+    }
+
+    LiquidGlassCard(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("auto_price_sync_card"),
+        glowColor = ElectricCyan
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (isLight) CyanTintBg else ElectricCyan.copy(alpha = 0.16f)
+                        )
+                        .border(
+                            BorderStroke(1.dp, if (isLight) CyanTintBorder else ElectricCyan.copy(alpha = 0.4f)),
+                            RoundedCornerShape(12.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Sync,
+                        contentDescription = "Sync",
+                        tint = if (isLight) CyanTintText else ElectricCyan,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .then(if (isSyncing) Modifier.rotate(rotation) else Modifier)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = if (isArabic) "تحديث تلقائي كل 12 ساعة" else "Auto-Updates Every 12 Hours",
+                            color = TextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        NeonBadge(
+                            text = "12H",
+                            accentColor = ElectricCyan
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = if (isSyncing) {
+                            if (isArabic) "جاري مسح وتحديث أسعار المنتجات الأساسية..." else "Scanning & updating essential products..."
+                        } else {
+                            if (isArabic) "آخر مسح لأسعار السلع الأساسية: $timeFormatted" else "Last essential scan: $timeFormatted"
+                        },
+                        color = if (isSyncing) ElectricCyan else TextSecondary,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Manual Refresh Pill Button
+            val refreshBg = if (isLight) CyanTintBg else Color(0x2200E5FF)
+            val refreshBorder = if (isLight) BorderStroke(1.dp, CyanTintBorder) else BorderStroke(1.dp, ElectricCyan.copy(alpha = 0.4f))
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(refreshBg)
+                    .border(refreshBorder, RoundedCornerShape(10.dp))
+                    .clickable(enabled = !isSyncing, onClick = onManualRefresh)
+                    .padding(horizontal = 10.dp, vertical = 7.dp)
+                    .testTag("manual_sync_button"),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (isArabic) "تحديث الآن" else "Update Now",
+                    color = if (isLight) CyanTintText else ElectricCyan,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun DirectProductPriceItem(
+    barcode: String,
+    itemName: String,
+    itemNameAr: String,
+    storeName: String,
+    storeNameAr: String,
+    priceDzd: Double,
+    isArabic: Boolean,
+    onEditPrice: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+    val cardBg = if (isLight) Color.White else Color(0xFF131D31)
+    val cardBorder = if (isLight) BorderStroke(1.dp, LightCardBorder) else BorderStroke(1.dp, Color(0x24FFFFFF))
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(cardBg)
+            .border(cardBorder, RoundedCornerShape(14.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .testTag("product_item_$barcode")
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (isArabic) itemNameAr else itemName,
+                    color = TextPrimary,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Storefront,
+                        contentDescription = null,
+                        tint = TextSecondary,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (isArabic) storeNameAr else storeName,
+                        color = TextSecondary,
+                        fontSize = 11.sp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "• EAN: $barcode",
+                        color = TextMuted,
+                        fontSize = 10.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Direct Price Display
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(
+                            if (isLight) MintTintBg else Color(0x2600E676)
+                        )
+                        .border(
+                            BorderStroke(1.dp, if (isLight) MintTintBorder else EmeraldSavings.copy(alpha = 0.5f)),
+                            RoundedCornerShape(10.dp)
+                        )
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = LocalizationUtil.formatDzd(priceDzd, isArabic),
+                        color = if (isLight) MintTintText else EmeraldSavings,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                IconButton(
+                    onClick = onEditPrice,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit Price",
+                        tint = if (isLight) CyanTintText else ElectricCyan.copy(alpha = 0.7f),
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+            }
+        }
     }
 }
 

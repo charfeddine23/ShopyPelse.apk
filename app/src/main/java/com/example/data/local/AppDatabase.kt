@@ -57,6 +57,11 @@ abstract class AppDatabase : RoomDatabase() {
             shoppingDao.insertItems(DatabaseInitialData.initialShoppingItems)
             marketPriceDao.insertMarketPrices(DatabaseInitialData.initialMarketPrices)
             marketPriceDao.insertPriceHistories(DatabaseInitialData.initialPriceHistories)
+
+            // Insert 1,000 realistic Algerian grocery and supermarket products
+            val catalog1000 = CatalogDataGenerator.generate1000Products()
+            val marketPrices1000 = CatalogDataGenerator.generateMarketPricesForCatalog(catalog1000)
+            marketPriceDao.insertMarketPrices(marketPrices1000)
         }
     }
 }
