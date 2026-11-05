@@ -58,10 +58,10 @@ abstract class AppDatabase : RoomDatabase() {
             marketPriceDao.insertMarketPrices(DatabaseInitialData.initialMarketPrices)
             marketPriceDao.insertPriceHistories(DatabaseInitialData.initialPriceHistories)
 
-            // Insert 1,000 realistic Algerian grocery and supermarket products
-            val catalog1000 = CatalogDataGenerator.generate1000Products()
-            val marketPrices1000 = CatalogDataGenerator.generateMarketPricesForCatalog(catalog1000)
-            marketPriceDao.insertMarketPrices(marketPrices1000)
+            // Insert 3,000 realistic Algerian grocery and supermarket products
+            val catalog3000 = CatalogDataGenerator.generate3000Products()
+            val marketPrices3000 = CatalogDataGenerator.generateMarketPricesForCatalog(catalog3000)
+            marketPriceDao.insertMarketPrices(marketPrices3000)
         }
     }
 }

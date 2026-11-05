@@ -339,28 +339,32 @@ object CatalogDataGenerator {
     )
 
     /**
-     * Generates a deterministic list of 1,000 distinct Algerian grocery items with barcodes and realistic DZD prices.
+     * Generates a deterministic list of 3,000 distinct Algerian grocery items with barcodes and realistic DZD prices.
      */
-    fun generate1000Products(): List<ShoppingItem> {
+    fun generate3000Products(): List<ShoppingItem> {
         val result = mutableListOf<ShoppingItem>()
         var currentId = 1L
         var templateIdx = 0
 
-        // Iterate until we reach 1,000 products
-        while (result.size < 1000) {
+        // Iterate until we reach 3,000 products
+        while (result.size < 3000) {
             val template = templates[templateIdx % templates.size]
+            val round = (templateIdx / templates.size) + 1
             for (brand in template.brands) {
                 for (unit in template.units) {
-                    if (result.size >= 1000) break
+                    if (result.size >= 3000) break
 
                     val barcodeNum = 6130000000000L + currentId
                     val barcode = barcodeNum.toString()
 
-                    val nameEn = "${brand.first} ${template.baseEn} ($unit)"
-                    val nameAr = "${template.baseAr} ${brand.second} ($unit)"
+                    val qualifierEn = if (round > 1) " Select #$round" else ""
+                    val qualifierAr = if (round > 1) " صنف #$round" else ""
+
+                    val nameEn = "${brand.first} ${template.baseEn}$qualifierEn ($unit)"
+                    val nameAr = "${template.baseAr} ${brand.second}$qualifierAr ($unit)"
 
                     // Slight price variation based on brand and unit index
-                    val priceMultiplier = 1.0 + ((currentId % 7) * 0.05) - 0.15
+                    val priceMultiplier = 1.0 + ((currentId % 11) * 0.04) - 0.18
                     val finalPrice = (template.defaultPriceDzd * priceMultiplier).toInt().coerceAtLeast(15)
 
                     result.add(
@@ -379,7 +383,7 @@ object CatalogDataGenerator {
                     )
                     currentId++
                 }
-                if (result.size >= 1000) break
+                if (result.size >= 3000) break
             }
             templateIdx++
         }

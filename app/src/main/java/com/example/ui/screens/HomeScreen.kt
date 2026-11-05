@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storefront
@@ -260,6 +261,7 @@ fun HomeScreen(
     // Add Item Modal Bottom Sheet
     if (showAddDialog) {
         val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+        val marketPrices by viewModel.marketPrices.collectAsStateWithLifecycle()
         ModalBottomSheet(
             onDismissRequest = { showAddDialog = false },
             sheetState = sheetState,
@@ -277,6 +279,7 @@ fun HomeScreen(
         ) {
             AddItemSheetContent(
                 isArabic = isArabic,
+                availableProducts = marketPrices,
                 onDismiss = {
                     scope.launch { sheetState.hide() }.invokeOnCompletion { showAddDialog = false }
                 },
@@ -847,6 +850,7 @@ private fun EmptyListCard(
 @Composable
 fun AddItemSheetContent(
     isArabic: Boolean,
+    availableProducts: List<com.example.data.model.MarketPrice> = emptyList(),
     onDismiss: () -> Unit,
     onAddItem: (name: String, nameAr: String, category: String, qty: Int, unit: String, barcode: String?, price: Double) -> Unit,
     onScanBarcode: () -> Unit
@@ -858,6 +862,27 @@ fun AddItemSheetContent(
     var unit by remember { mutableStateOf("pcs") }
     var barcode by remember { mutableStateOf("") }
     var estimatedPrice by remember { mutableDoubleStateOf(0.0) }
+    var productSearchQuery by remember { mutableStateOf("") }
+
+    // Distinct catalog products from the prices page
+    val distinctCatalog = remember(availableProducts) {
+        availableProducts.distinctBy { it.barcode }
+    }
+
+    // Filter catalog products for fast selection
+    val filteredCatalog = remember(distinctCatalog, productSearchQuery) {
+        if (productSearchQuery.isBlank()) {
+            distinctCatalog.take(15) // Show top items initially
+        } else {
+            distinctCatalog.filter {
+                it.itemName.contains(productSearchQuery, ignoreCase = true) ||
+                it.itemNameAr.contains(productSearchQuery, ignoreCase = true) ||
+                it.barcode.contains(productSearchQuery)
+            }.take(30)
+        }
+    }
+
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
 
     Column(
         modifier = Modifier
@@ -869,12 +894,19 @@ fun AddItemSheetContent(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = if (isArabic) "إضافة عنصر جديد" else "Add New Item",
-                color = TextPrimary,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Column {
+                Text(
+                    text = if (isArabic) "إضافة عنصر إلى القائمة" else "Add Item to Shopping List",
+                    color = TextPrimary,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = if (isArabic) "اختر مباشرة من منتجات صفحة الأسعار أو أضف يدوياً" else "Pick directly from prices catalog or enter manually",
+                    color = TextSecondary,
+                    fontSize = 11.sp
+                )
+            }
             IconButton(onClick = onDismiss) {
                 Icon(
                     imageVector = Icons.Default.Clear,
@@ -886,11 +918,106 @@ fun AddItemSheetContent(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        // Catalog Search & Selector Section (اختر من منتجات الأسعار)
+        if (distinctCatalog.isNotEmpty()) {
+            OutlinedTextField(
+                value = productSearchQuery,
+                onValueChange = { productSearchQuery = it },
+                placeholder = {
+                    Text(
+                        if (isArabic) "ابحث في ${distinctCatalog.size} منتج من صفحة الأسعار..." else "Search ${distinctCatalog.size} catalog products...",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = if (isLight) CyanTintText else ElectricCyan
+                    )
+                },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = if (isLight) Color(0xFFF1F5F9) else Color(0x33141F32),
+                    unfocusedContainerColor = if (isLight) Color(0xFFF8FAFC) else Color(0x22141F32),
+                    focusedBorderColor = ElectricCyan,
+                    unfocusedBorderColor = GlassBorder,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary
+                )
+            )
+
+            // Horizontal Catalog Quick-Pick Chips
+            androidx.compose.foundation.lazy.LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(filteredCatalog.size) { idx ->
+                    val prod = filteredCatalog[idx]
+                    val isSelected = (barcode == prod.barcode)
+                    val chipBg = if (isSelected) {
+                        ElectricCyan.copy(alpha = 0.22f)
+                    } else if (isLight) {
+                        Color(0xFFF1F5F9)
+                    } else {
+                        Color(0x18FFFFFF)
+                    }
+                    val chipBorder = if (isSelected) {
+                        BorderStroke(1.5.dp, ElectricCyan)
+                    } else {
+                        BorderStroke(1.dp, if (isLight) LightCardBorder else Color(0x15FFFFFF))
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(chipBg)
+                            .border(chipBorder, RoundedCornerShape(10.dp))
+                            .clickable {
+                                name = prod.itemName
+                                nameAr = prod.itemNameAr
+                                barcode = prod.barcode
+                                estimatedPrice = prod.priceDzd
+                            }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Column {
+                            Text(
+                                text = if (isArabic) prod.itemNameAr else prod.itemName,
+                                color = if (isSelected) ElectricCyan else TextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                maxLines = 1
+                            )
+                            Text(
+                                text = LocalizationUtil.formatDzd(prod.priceDzd, isArabic),
+                                color = EmeraldSavings,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
         // Name input
         OutlinedTextField(
-            value = name,
-            onValueChange = { name = it },
-            label = { Text(if (isArabic) "اسم المنتج (مثال: حليب كانديا)" else "Product Name (e.g. Candia Milk)") },
+            value = if (isArabic && nameAr.isNotBlank()) nameAr else name,
+            onValueChange = {
+                name = it
+                if (isArabic) nameAr = it
+            },
+            label = { Text(if (isArabic) "اسم المنتج المحدد" else "Selected Product Name") },
             singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()

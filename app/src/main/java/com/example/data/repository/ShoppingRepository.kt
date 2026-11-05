@@ -57,10 +57,10 @@ class ShoppingRepository(
 
     suspend fun ensureCatalogPopulated() {
         val currentPrices = marketPriceDao.getAllMarketPrices().first()
-        if (currentPrices.size < 100) {
-            val catalog1000 = com.example.data.local.CatalogDataGenerator.generate1000Products()
-            val marketPrices1000 = com.example.data.local.CatalogDataGenerator.generateMarketPricesForCatalog(catalog1000)
-            marketPriceDao.insertMarketPrices(marketPrices1000)
+        if (currentPrices.size < 2500) {
+            val catalog3000 = com.example.data.local.CatalogDataGenerator.generate3000Products()
+            val marketPrices3000 = com.example.data.local.CatalogDataGenerator.generateMarketPricesForCatalog(catalog3000)
+            marketPriceDao.insertMarketPrices(marketPrices3000)
         }
     }
 
