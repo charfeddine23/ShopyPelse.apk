@@ -28,16 +28,10 @@ abstract class BaseActivity : ComponentActivity() {
     }
 
     /**
-     * Programmatically forces the decorView layout direction to RTL for Arabic
-     * or LTR for English/other languages.
+     * Keeps decorView layout direction fixed to LTR so UI elements do not mirror on language changes.
      */
     fun syncDecorViewLayoutDirection() {
-        val currentLang = LocaleHelper.getLanguage(this)
-        window.decorView.layoutDirection = if (currentLang == LocaleHelper.LANG_ARABIC) {
-            View.LAYOUT_DIRECTION_RTL
-        } else {
-            View.LAYOUT_DIRECTION_LTR
-        }
+        window.decorView.layoutDirection = View.LAYOUT_DIRECTION_LTR
     }
 
     /**

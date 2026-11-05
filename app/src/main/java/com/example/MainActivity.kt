@@ -105,13 +105,15 @@ class MainActivity : BaseActivity() {
         setContent {
             val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
             val isArabic by viewModel.isArabic.collectAsStateWithLifecycle()
-            val layoutDirection = if (isArabic) LayoutDirection.Rtl else LayoutDirection.Ltr
 
-            // Also synchronize native window decorView for system dialogs/popups
-            syncDecorViewLayoutDirection()
+            // Direction: Left to Right (من الجهة اليسرى إلى اليمنى)
+            val ltrDirection = LayoutDirection.Ltr
+
+            // Native window decorView LTR
+            window.decorView.layoutDirection = android.view.View.LAYOUT_DIRECTION_LTR
 
             ShopyPelseTheme(darkTheme = isDarkMode) {
-                CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+                CompositionLocalProvider(LocalLayoutDirection provides ltrDirection) {
                     SoukSmartApp(viewModel = viewModel, isDarkMode = isDarkMode)
                 }
             }
