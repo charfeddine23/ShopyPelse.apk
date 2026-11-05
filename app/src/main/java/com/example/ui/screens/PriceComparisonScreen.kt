@@ -107,18 +107,25 @@ fun PriceComparisonScreen(
     val isSyncingPrices by viewModel.isSyncingPrices.collectAsStateWithLifecycle()
     val updatedCount by viewModel.updatedItemsCount.collectAsStateWithLifecycle()
 
+    val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
     var searchQuery by remember { mutableStateOf("") }
     var reportItemDialog by remember { mutableStateOf<MarketPrice?>(null) }
 
-    // Group prices by product barcode
-    val groupedProducts = remember(allPrices, searchQuery) {
-        val filtered = if (searchQuery.isBlank()) {
-            allPrices
-        } else {
+    // Group prices by product barcode, prioritizing search query if user types, else category filter
+    val groupedProducts = remember(allPrices, searchQuery, selectedCategory) {
+        val filtered = if (searchQuery.isNotBlank()) {
+            // When searching: bring all matching products across all categories
             allPrices.filter {
                 it.itemName.contains(searchQuery, ignoreCase = true) ||
                 it.itemNameAr.contains(searchQuery, ignoreCase = true) ||
                 it.barcode.contains(searchQuery)
+            }
+        } else if (selectedCategory == "All") {
+            allPrices
+        } else {
+            // Classify by category
+            allPrices.filter { price ->
+                viewModel.autoCategorize(price.itemName).equals(selectedCategory, ignoreCase = true)
             }
         }
         filtered.groupBy { it.barcode }
@@ -222,7 +229,65 @@ fun PriceComparisonScreen(
                 )
             }
 
-            // Section Title: 1000 Products Catalog & Price list
+            // Category Chips Selector in PriceComparisonScreen
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    androidx.compose.foundation.lazy.LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(LocalizationUtil.allCategories.size) { idx ->
+                            val cat = LocalizationUtil.allCategories[idx]
+                            val isSelected = selectedCategory == cat
+                            val label = if (cat == "All") {
+                                if (isArabic) "الكل" else "All"
+                            } else {
+                                LocalizationUtil.getCategoryLabel(cat, isArabic)
+                            }
+
+                            val isLightCat = MaterialTheme.colorScheme.background == BackgroundLight
+                            val chipBg = if (isLightCat) {
+                                if (isSelected) CyanTintBg else Color.White
+                            } else {
+                                if (isSelected) ElectricCyan.copy(alpha = 0.25f) else Color(0x1F1E283A)
+                            }
+                            val chipBorder = if (isLightCat) {
+                                if (isSelected) BorderStroke(1.5.dp, CyanTintBorder) else BorderStroke(1.dp, LightCardBorder)
+                            } else {
+                                if (isSelected) BorderStroke(1.dp, ElectricCyan) else BorderStroke(1.dp, Color(0x20FFFFFF))
+                            }
+                            val chipTextColor = if (isLightCat) {
+                                if (isSelected) CyanTintText else TextPrimary
+                            } else {
+                                if (isSelected) ElectricCyan else TextSecondary
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(chipBg)
+                                    .border(chipBorder, RoundedCornerShape(12.dp))
+                                    .clickable { viewModel.setSelectedCategory(cat) }
+                                    .padding(horizontal = 14.dp, vertical = 7.dp)
+                            ) {
+                                Text(
+                                    text = label,
+                                    color = chipTextColor,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Section Title: Products Catalog & Price list
             item {
                 Row(
                     modifier = Modifier

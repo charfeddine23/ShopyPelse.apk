@@ -117,6 +117,10 @@ class ShoppingViewModel(
         _selectedCategory.value = category
     }
 
+    fun autoCategorize(name: String): String {
+        return repository.autoCategorize(name)
+    }
+
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
     }

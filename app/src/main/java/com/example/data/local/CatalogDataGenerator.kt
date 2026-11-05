@@ -159,7 +159,7 @@ object CatalogDataGenerator {
             units = listOf("80g", "3x80g", "160g قطعة واحدة", "بالطماطم 160g")
         ),
 
-        // Fresh Produce & Farm Goods (خضر وفواكه طازجة)
+        // Fresh Produce & Farm Goods (خضر وفواكه طازجة شاملة)
         ProductTemplate(
             baseEn = "Fresh Potatoes",
             baseAr = "بطاطا محلية طازجة",
@@ -193,6 +193,86 @@ object CatalogDataGenerator {
             units = listOf("1kg", "2kg", "كيس 2 كغ")
         ),
         ProductTemplate(
+            baseEn = "Fresh Garlic",
+            baseAr = "ثوم أحمر وأبيض محلي",
+            category = "Produce",
+            defaultPriceDzd = 450.0,
+            brands = listOf("Mila Garlic" to "ثوم ميلة الأصيل", "Biskra Garlic" to "ثوم بسكرة"),
+            units = listOf("500g", "1kg", "ربطة 1 كغ")
+        ),
+        ProductTemplate(
+            baseEn = "Green & Sweet Peppers",
+            baseAr = "فلفل حلو وحار محلي",
+            category = "Produce",
+            defaultPriceDzd = 140.0,
+            brands = listOf("Biskra Greenhouses" to "بيوت بسكرة", "Mostaganem" to "مستغانم"),
+            units = listOf("حلو 1kg", "حار 500g", "حار 1kg", "مشكل 1.5kg")
+        ),
+        ProductTemplate(
+            baseEn = "Fresh Zucchini (Courgettes)",
+            baseAr = "قرعة وكوسة طازجة",
+            category = "Produce",
+            defaultPriceDzd = 110.0,
+            brands = listOf("Mitidja Green" to "متيجة الخضراء", "Blida" to "مزارع البليدة"),
+            units = listOf("1kg", "2kg", "صندوق 2.5 كغ")
+        ),
+        ProductTemplate(
+            baseEn = "Fresh Eggplants (Aubergines)",
+            baseAr = "باذنجان أسود طازج",
+            category = "Produce",
+            defaultPriceDzd = 120.0,
+            brands = listOf("Mitidja Farm" to "مزارع متيجة", "Tipaza" to "تيبازة"),
+            units = listOf("1kg", "2kg")
+        ),
+        ProductTemplate(
+            baseEn = "Green Cucumbers",
+            baseAr = "خيار طازج ومقرمش",
+            category = "Produce",
+            defaultPriceDzd = 130.0,
+            brands = listOf("Biskra Greenhouses" to "بيوت بسكرة", "Blida" to "البليدة"),
+            units = listOf("1kg", "2kg")
+        ),
+        ProductTemplate(
+            baseEn = "Green Lettuce & Salad",
+            baseAr = "سلطة وخس طازج",
+            category = "Produce",
+            defaultPriceDzd = 120.0,
+            brands = listOf("Tipaza Salad" to "خس تيبازة", "Boufarik" to "بوفاريك"),
+            units = listOf("حبة واحدة", "1kg", "حبتين طازجتين")
+        ),
+        ProductTemplate(
+            baseEn = "Fresh Green Beans (Haricots Verts)",
+            baseAr = "لوبيا خضراء فصوص طازجة",
+            category = "Produce",
+            defaultPriceDzd = 220.0,
+            brands = listOf("Mitidja Farm" to "مزارع متيجة", "Ain Defla" to "عين الدفلى"),
+            units = listOf("500g", "1kg", "2kg")
+        ),
+        ProductTemplate(
+            baseEn = "Fresh Green Peas (Petits Pois)",
+            baseAr = "جلبانة خضراء طازجة",
+            category = "Produce",
+            defaultPriceDzd = 240.0,
+            brands = listOf("Tipaza Fresh" to "تيبازة الخضراء", "Blida" to "البليدة"),
+            units = listOf("1kg", "2kg", "حب مقشر 1kg")
+        ),
+        ProductTemplate(
+            baseEn = "Cauliflower & Cabbage",
+            baseAr = "شفلور وكرنب طازج",
+            category = "Produce",
+            defaultPriceDzd = 90.0,
+            brands = listOf("Mitidja Plain" to "سهل متيجة", "Mascara" to "معسكر"),
+            units = listOf("شفلور حبة", "كرنب حبة", "1kg")
+        ),
+        ProductTemplate(
+            baseEn = "Fresh Spinach & Herbs",
+            baseAr = "سلق ودبشة ومعدنوس ونعناع",
+            category = "Produce",
+            defaultPriceDzd = 40.0,
+            brands = listOf("Alger Terroir" to "حقول العاصمة", "Blida" to "البليدة"),
+            units = listOf("ربطة سلق", "ربطة معدنوس ودبشة", "ربطة نعناع طازج")
+        ),
+        ProductTemplate(
             baseEn = "Golden Delicious Apples",
             baseAr = "تفاح محلي ومستورد",
             category = "Produce",
@@ -215,6 +295,70 @@ object CatalogDataGenerator {
             defaultPriceDzd = 140.0,
             brands = listOf("Mitidja Citrus" to "حمضيات متيجة", "Boufarik" to "بوفاريك", "Mascara" to "معسكر"),
             units = listOf("1kg", "2kg", "شبكة 3 كغ")
+        ),
+        ProductTemplate(
+            baseEn = "Fresh Yellow Lemons",
+            baseAr = "ليمون طازج وحامض",
+            category = "Produce",
+            defaultPriceDzd = 250.0,
+            brands = listOf("Mitidja Lemon" to "ليمون متيجة", "Boufarik" to "بوفاريك"),
+            units = listOf("500g", "1kg", "2kg")
+        ),
+        ProductTemplate(
+            baseEn = "Fresh Algerian Strawberries",
+            baseAr = "فراولة جزائرية حلوة",
+            category = "Produce",
+            defaultPriceDzd = 320.0,
+            brands = listOf("Tipaza Strawberry" to "فراولة تيبازة الشهيرة", "Skikda" to "سكيكدة"),
+            units = listOf("علبة 500غ", "1kg", "سلة 2 كغ")
+        ),
+        ProductTemplate(
+            baseEn = "Watermelon & Sweet Melon",
+            baseAr = "دلاع وبطيخ أصفر حلو",
+            category = "Produce",
+            defaultPriceDzd = 90.0,
+            brands = listOf("Oued Righ" to "دلاع وادي ريغ", "Biskra Desert" to "بسكرة الصحراوية", "Mascara" to "معسكر"),
+            units = listOf("دلاعة 5kg", "دلاعة 8kg", "بطيخ أصفر 3kg", "1kg مقطع")
+        ),
+        ProductTemplate(
+            baseEn = "Sweet Peaches & Nectarines",
+            baseAr = "خوخ ونكتارين طازج ولذيذ",
+            category = "Produce",
+            defaultPriceDzd = 340.0,
+            brands = listOf("Mascara Terroir" to "خوخ معسكر", "Batna Orchards" to "بساتين باتنة"),
+            units = listOf("1kg", "2kg", "صندوق 3 كغ")
+        ),
+        ProductTemplate(
+            baseEn = "Fresh Grapes (Raisins)",
+            baseAr = "عنب محلي أبيض وأسود",
+            category = "Produce",
+            defaultPriceDzd = 260.0,
+            brands = listOf("Médéa Grapes" to "عنب المدية", "Mascara" to "معسكر"),
+            units = listOf("عنب أبيض 1kg", "عنب أحمر 1kg", "2kg")
+        ),
+        ProductTemplate(
+            baseEn = "Fresh Apricots (Abricots)",
+            baseAr = "مشمش طازج بلدي",
+            category = "Produce",
+            defaultPriceDzd = 290.0,
+            brands = listOf("Batna Aurès" to "مشمش الأوراس", "Médéa" to "المدية"),
+            units = listOf("1kg", "2kg")
+        ),
+        ProductTemplate(
+            baseEn = "Algerian Deglet Nour Dates",
+            baseAr = "تمر دقلة نور بسكرة الأصلية",
+            category = "Produce",
+            defaultPriceDzd = 650.0,
+            brands = listOf("Tolga Biskra" to "طولقة بسكرة الفاخرة", "Oued Souf" to "وادي سوف"),
+            units = listOf("علبة 500غ", "علبة 1 كغ", "حبة العرجون 2 كغ")
+        ),
+        ProductTemplate(
+            baseEn = "Fresh Sweet Pomegranates",
+            baseAr = "رمان حلو بلدي",
+            category = "Produce",
+            defaultPriceDzd = 210.0,
+            brands = listOf("Messaad Pomegranate" to "رمان مسعد الشهير", "Chlef" to "الشلف"),
+            units = listOf("1kg", "2kg", "سلة 3 كغ")
         ),
 
         // Beverages & Juices (مشروبات ومياه)

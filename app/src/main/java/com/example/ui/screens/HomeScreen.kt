@@ -164,12 +164,15 @@ fun HomeScreen(
                 )
             }
 
-            // Category Filter Chips
+            // Category Filter Chips (Tapping a category filters and navigates to products in that category)
             item {
                 CategoryChipsSection(
                     selectedCategory = selectedCategory,
                     isArabic = isArabic,
-                    onSelectCategory = { viewModel.setSelectedCategory(it) }
+                    onSelectCategory = { category ->
+                        viewModel.setSelectedCategory(category)
+                        onNavigateToPriceComparison()
+                    }
                 )
             }
 
