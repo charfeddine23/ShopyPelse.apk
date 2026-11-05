@@ -479,6 +479,146 @@ object CatalogDataGenerator {
             defaultPriceDzd = 75.0,
             brands = listOf("Palmolive" to "بالموليف", "Dove" to "دوف", "Duru" to "دورو", "Lux" to "لوكس", "Marseille" to "مرسيليا أصيل"),
             units = listOf("100g", "125g", "Lot de 4 قطعات")
+        ),
+
+        // Nuts & Premium Sweets (مكسرات وحلويات جزائرية فاخرة)
+        ProductTemplate(
+            baseEn = "Roasted & Salted Almonds",
+            baseAr = "لوز محمص ومملح فاخر",
+            category = "SweetsNuts",
+            defaultPriceDzd = 1850.0,
+            brands = listOf("El-Wiam Nuts" to "مكسرات الوئام", "Moul El-Kahwa" to "محمصة الأصالة", "Alger Terroir" to "لوز بلدي"),
+            units = listOf("100g", "250g", "500g", "1kg")
+        ),
+        ProductTemplate(
+            baseEn = "Roasted Pistachios",
+            baseAr = "فستق بيستاش محمص ومملح",
+            category = "SweetsNuts",
+            defaultPriceDzd = 2600.0,
+            brands = listOf("Royal Nuts" to "رويال ناتس", "El-Djazair Roastery" to "محمصة الجزائر", "Al-Baraka" to "البركة"),
+            units = listOf("100g", "250g", "500g", "1kg")
+        ),
+        ProductTemplate(
+            baseEn = "Roasted Hazelnuts (Noisettes)",
+            baseAr = "بندق محمص مقشر ولذيذ",
+            category = "SweetsNuts",
+            defaultPriceDzd = 2200.0,
+            brands = listOf("El-Wiam Nuts" to "مكسرات الوئام", "Select Roaster" to "المحمصة الذهبية"),
+            units = listOf("100g", "250g", "500g")
+        ),
+        ProductTemplate(
+            baseEn = "Shelled Walnuts (Noix)",
+            baseAr = "عين الجمل وجوز مقشر بلدي",
+            category = "SweetsNuts",
+            defaultPriceDzd = 1750.0,
+            brands = listOf("Jijel Terroir" to "جوز جيجل الطبيعي", "Royal Nuts" to "رويال ناتس"),
+            units = listOf("150g", "250g", "500g", "1kg")
+        ),
+        ProductTemplate(
+            baseEn = "Roasted Peanuts (Cacahuètes)",
+            baseAr = "كاوكاو محمص ومملح بالقشور وبدون قشور",
+            category = "SweetsNuts",
+            defaultPriceDzd = 420.0,
+            brands = listOf("El-Bahdja" to "كاوكاو البهجة", "El-Wiam" to "الوئام", "Torrefaction" to "محمصة الحي"),
+            units = listOf("250g", "500g", "1kg كيس")
+        ),
+        ProductTemplate(
+            baseEn = "Mixed Cocktail Nuts",
+            baseAr = "كوكتيل مكسرات مشكلة فاخرة",
+            category = "SweetsNuts",
+            defaultPriceDzd = 1950.0,
+            brands = listOf("Royal Mixed" to "رويال ميكس", "El-Baraka" to "البركة الفاخرة"),
+            units = listOf("200g علبة", "400g", "800g بوكس فاخر")
+        ),
+        ProductTemplate(
+            baseEn = "Traditional Halwa Chamia (Halwet El Turk)",
+            baseAr = "حلوة الترك وشامية فاخرة بالفستق",
+            category = "SweetsNuts",
+            defaultPriceDzd = 290.0,
+            brands = listOf("La Gazelle" to "الغزالة الشهيرة", "El-Kassala" to "القصالة", "Al-Afrah" to "الأفراح"),
+            units = listOf("200g", "علبة 400غ", "سطل 800غ بالفستق")
+        ),
+        ProductTemplate(
+            baseEn = "Algerian Traditional Baklawa & Makroud",
+            baseAr = "حلويات تقليدية بقلاوة ومقروط العسل",
+            category = "SweetsNuts",
+            defaultPriceDzd = 1200.0,
+            brands = listOf("Délices d'Alger" to "حلويات العاصمة", "Patisserie Royale" to "الملكية للحلويات"),
+            units = listOf("علبة 500غ", "طبق 1kg مشكل", "صينية أفراح 2kg")
+        ),
+        ProductTemplate(
+            baseEn = "Chocolate Bars & Pralines",
+            baseAr = "ألواح شوكولاطة فاخرة ومحشوة",
+            category = "SweetsNuts",
+            defaultPriceDzd = 160.0,
+            brands = listOf("Bimo Chocolat" to "بيمو", "Palmary" to "بالماري شوكو", "Chocodad" to "شوكوداد", "El Mordjene" to "المرجان"),
+            units = listOf("Noir 100g", "Lait 100g", "Noisettes 150g بالبندق", "علبة برالينيه 250غ")
+        ),
+
+        // Hot Teas & Ready Herbal Infusions (شاي وأعشاب ومشروبات ساخنة جاهزة)
+        ProductTemplate(
+            baseEn = "Sahara Green Gunpowder Tea",
+            baseAr = "شاي أخضر صحراوي أصيل بالنعناع",
+            category = "HerbalDrinks",
+            defaultPriceDzd = 220.0,
+            brands = listOf("Al-Qafila" to "شاي القافلة الصحراوي", "Al-Waha" to "شاي الواحة", "Sultan" to "شاي سلطان", "Lipton" to "ليبتون"),
+            units = listOf("200g حبوب", "باكي 500غ", "علبة 25 كيس جاهز للتحضير")
+        ),
+        ProductTemplate(
+            baseEn = "Natural Dried Ginger (Zanjabil)",
+            baseAr = "زنجبيل طبيعي مجفف ومطحون وشاي الزنجبيل بالليمون",
+            category = "HerbalDrinks",
+            defaultPriceDzd = 190.0,
+            brands = listOf("Herbalis DZ" to "أعشاب الجزائر", "Al-Hana Bio" to "الهناء بيو", "Twinings" to "تويننجز"),
+            units = listOf("علبة 20 كيس جاهز", "مطحون 150g", "زنجبيل بالليمون والعسل 20 أكياس")
+        ),
+        ProductTemplate(
+            baseEn = "Wild Mountain Thyme (Zaatar)",
+            baseAr = "زعتر بري جبلي أصيل للإنفوزيون والشرب",
+            category = "HerbalDrinks",
+            defaultPriceDzd = 180.0,
+            brands = listOf("Djurdjura Bio" to "زعتر جرجرة الجبلي", "Al-Atlas" to "أعشاب الأطلس", "Al-Hana" to "الهناء"),
+            units = listOf("مجفف 100g", "علبة 20 كيس تيزانة", "ربطة جبلية 250g")
+        ),
+        ProductTemplate(
+            baseEn = "Pure Peppermint & Spearmint Tea",
+            baseAr = "نعناع بري مجفف وأكياس شاي النعناع الصافي",
+            category = "HerbalDrinks",
+            defaultPriceDzd = 150.0,
+            brands = listOf("Mouna Bio" to "تيزانة منى", "Al-Waha" to "الواحة الخضراء", "Herbalis" to "هرباليس"),
+            units = listOf("علبة 20 كيس تيزانة", "نعناع يابس 100g", "نعناع وفليو بلدي 150g")
+        ),
+        ProductTemplate(
+            baseEn = "Chamomile Soothing Flowers (Baboundj)",
+            baseAr = "أزهار البابونج المهدئة وتيزانة الاسترخاء",
+            category = "HerbalDrinks",
+            defaultPriceDzd = 210.0,
+            brands = listOf("Al-Hana Bio" to "بابونج الهناء بيو", "Infusion DZ" to "أعشاب الراحة"),
+            units = listOf("علبة 20 كيس", "أزهار 100g", "بابونج وزيزفون 150g")
+        ),
+        ProductTemplate(
+            baseEn = "Verbena Leaf Tea (Louiza)",
+            baseAr = "أوراق اللويزة العطرية الطبيعية للهضم والاسترخاء",
+            category = "HerbalDrinks",
+            defaultPriceDzd = 220.0,
+            brands = listOf("Djurdjura Terroir" to "لويزة جرجرة", "Herbalis DZ" to "هرباليس الأصيلة"),
+            units = listOf("علبة 20 كيس جاهز", "أوراق مجففة 100g", "حزمة عائلية 200g")
+        ),
+        ProductTemplate(
+            baseEn = "Anise & Fennel Seeds Infusion (Habat Hlaoua)",
+            baseAr = "شاي اليانسون وحبة حلاوة والنافع الطبيعي",
+            category = "HerbalDrinks",
+            defaultPriceDzd = 175.0,
+            brands = listOf("Al-Atlas Bio" to "أعشاب الأطلس", "Herbalis" to "هرباليس الجزائر"),
+            units = listOf("حبوب 150g", "علبة 20 كيس جاهز", "مزيج الهضم 200g")
+        ),
+        ProductTemplate(
+            baseEn = "Rosemary & Sage Infusion (Iklil El Djabal)",
+            baseAr = "إكليل الجبل والميرمية الجبلية الطبيعية",
+            category = "HerbalDrinks",
+            defaultPriceDzd = 185.0,
+            brands = listOf("Aurès Bio" to "أعشاب الأوراس", "Djurdjura Terroir" to "جرجرة الطبيعية"),
+            units = listOf("علبة 20 كيس", "مجفف 120g")
         )
     )
 

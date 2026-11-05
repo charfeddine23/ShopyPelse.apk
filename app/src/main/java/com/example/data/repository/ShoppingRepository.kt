@@ -166,6 +166,17 @@ class ShoppingRepository(
             lower.contains("steak") || lower.contains("escalope") || lower.contains("كفتة") ||
             lower.contains("fish") || lower.contains("poisson") || lower.contains("سمك") -> "Butchery"
 
+            lower.contains("amande") || lower.contains("لوز") || lower.contains("pistache") || lower.contains("فستق") ||
+            lower.contains("noisette") || lower.contains("بندق") || lower.contains("cacahuete") || lower.contains("كاوكاو") ||
+            lower.contains("noix") || lower.contains("جوز") || lower.contains("nut") || lower.contains("مكسرات") ||
+            lower.contains("bonbon") || lower.contains("حلوى") || lower.contains("chocolat") || lower.contains("شوكولا") ||
+            lower.contains("halwa") || lower.contains("حلوة الترك") || lower.contains("gateau") || lower.contains("حلويات") -> "SweetsNuts"
+
+            lower.contains("gingembre") || lower.contains("زنجبيل") || lower.contains("menthe") || lower.contains("نعناع") ||
+            lower.contains("thym") || lower.contains("زعتر") || lower.contains("tisane") || lower.contains("تيزانة") ||
+            lower.contains("camomille") || lower.contains("بابونج") || lower.contains("verveine") || lower.contains("لويزة") ||
+            lower.contains("tea") || lower.contains("thé") || lower.contains("شاي") -> "HerbalDrinks"
+
             lower.contains("water") || lower.contains("eau") || lower.contains("ماء") ||
             lower.contains("juice") || lower.contains("jus") || lower.contains("عصير") ||
             lower.contains("soda") || lower.contains("gazouz") || lower.contains("مشروب") ||

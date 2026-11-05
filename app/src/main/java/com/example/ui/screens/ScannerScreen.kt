@@ -54,6 +54,7 @@ import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -567,83 +568,53 @@ fun ScannerScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Best Price Highlight Box
+                    // Direct Price Card from Prices Page (No comparison)
+                    val matchedItem = detectedPrices.firstOrNull()
+                    val directPrice = matchedItem?.priceDzd ?: minPrice
+                    val rawTitle = if (isArabic) scannedProductTitleAr else scannedProductTitle
+                    val displayFormattedTitle = if (rawTitle.contains("(") && rawTitle.contains(")")) {
+                        val main = rawTitle.substringBefore("(").trim()
+                        val details = rawTitle.substringAfter("(").substringBefore(")").trim()
+                        "$main - $details"
+                    } else {
+                        rawTitle
+                    }
+
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
                             .background(Color(0x2200E676))
                             .border(BorderStroke(1.dp, EmeraldSavings.copy(alpha = 0.5f)), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = if (isArabic) "أفضل سعر متاح الآن:" else "Lowest price detected:",
+                                    text = if (isArabic) "السعر في صفحة الأسعار:" else "Price in Catalog:",
                                     color = TextSecondary,
                                     fontSize = 11.sp
                                 )
+                                Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = if (isArabic) (bestStore?.storeNameAr ?: "") else (bestStore?.storeName ?: ""),
+                                    text = displayFormattedTitle,
                                     color = TextPrimary,
                                     fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                             Text(
-                                text = LocalizationUtil.formatDzd(minPrice, isArabic),
+                                text = LocalizationUtil.formatDzd(directPrice, isArabic),
                                 color = EmeraldSavings,
                                 fontSize = 22.sp,
                                 fontWeight = FontWeight.ExtraBold
                             )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Store Comparison Horizontal Chips (Clean & compact, non-messy)
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(detectedPrices) { price ->
-                            val isCheapest = price.priceDzd == minPrice
-                            Row(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isCheapest) EmeraldSavings.copy(alpha = 0.15f) else Color(0x15FFFFFF))
-                                    .border(
-                                        BorderStroke(1.dp, if (isCheapest) EmeraldSavings else Color(0x22FFFFFF)),
-                                        RoundedCornerShape(10.dp)
-                                    )
-                                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Storefront,
-                                    contentDescription = null,
-                                    tint = if (isCheapest) EmeraldSavings else TextSecondary,
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = if (isArabic) price.storeNameAr else price.storeName,
-                                    color = TextPrimary,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isCheapest) FontWeight.Bold else FontWeight.Normal
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = LocalizationUtil.formatDzd(price.priceDzd, isArabic),
-                                    color = if (isCheapest) EmeraldSavings else TextSecondary,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
                         }
                     }
 

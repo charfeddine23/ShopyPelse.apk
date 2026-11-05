@@ -540,10 +540,22 @@ fun SupermarketItemCard(
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            // Oversized Title and Info
+            // Oversized Title and Info (Name - Type and Details)
             Column(modifier = Modifier.weight(1f)) {
+                val rawTitle = if (isArabic) item.nameAr else item.name
+                val displayTitle = if (rawTitle.contains("(") && rawTitle.contains(")")) {
+                    val main = rawTitle.substringBefore("(").trim()
+                    val details = rawTitle.substringAfter("(").substringBefore(")").trim()
+                    "$main - $details"
+                } else if (!rawTitle.contains(" - ")) {
+                    val catLabel = LocalizationUtil.getCategoryLabel(item.category, isArabic)
+                    "$rawTitle - $catLabel"
+                } else {
+                    rawTitle
+                }
+
                 Text(
-                    text = if (isArabic) item.nameAr else item.name,
+                    text = displayTitle,
                     color = if (item.isChecked) TextMuted else TextPrimary,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,

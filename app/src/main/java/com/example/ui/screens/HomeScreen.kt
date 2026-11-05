@@ -694,8 +694,20 @@ fun ShoppingItemRow(
 
             // Item Name & Category Details
             Column(modifier = Modifier.weight(1f)) {
+                val rawTitle = if (isArabic) item.nameAr else item.name
+                val displayTitle = if (rawTitle.contains("(") && rawTitle.contains(")")) {
+                    val main = rawTitle.substringBefore("(").trim()
+                    val details = rawTitle.substringAfter("(").substringBefore(")").trim()
+                    "$main - $details"
+                } else if (!rawTitle.contains(" - ")) {
+                    val catLabel = LocalizationUtil.getCategoryLabel(item.category, isArabic)
+                    "$rawTitle - $catLabel"
+                } else {
+                    rawTitle
+                }
+
                 Text(
-                    text = if (isArabic) item.nameAr else item.name,
+                    text = displayTitle,
                     color = if (item.isChecked) TextMuted else TextPrimary,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -992,8 +1004,18 @@ fun AddItemSheetContent(
                             .padding(horizontal = 10.dp, vertical = 6.dp)
                     ) {
                         Column {
+                            val formattedTitle = if (isArabic) {
+                                val base = prod.itemNameAr.substringBefore("(").trim()
+                                val extra = prod.itemNameAr.substringAfter("(", "").substringBefore(")").trim()
+                                if (extra.isNotBlank()) "$base - $extra" else base
+                            } else {
+                                val base = prod.itemName.substringBefore("(").trim()
+                                val extra = prod.itemName.substringAfter("(", "").substringBefore(")").trim()
+                                if (extra.isNotBlank()) "$base - $extra" else base
+                            }
+
                             Text(
-                                text = if (isArabic) prod.itemNameAr else prod.itemName,
+                                text = formattedTitle,
                                 color = if (isSelected) ElectricCyan else TextPrimary,
                                 fontSize = 12.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,

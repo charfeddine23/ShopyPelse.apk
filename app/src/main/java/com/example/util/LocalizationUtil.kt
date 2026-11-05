@@ -26,6 +26,8 @@ object LocalizationUtil {
                 "Pantry" -> "مواد غذائية"
                 "Butchery" -> "لحوم ودواجن"
                 "Beverages" -> "مشروبات"
+                "SweetsNuts" -> "مكسرات وحلويات"
+                "HerbalDrinks" -> "شاي وأعشاب ساخنة"
                 "Household" -> "مواد تنظيف"
                 else -> "أخرى"
             }
@@ -37,6 +39,8 @@ object LocalizationUtil {
                 "Pantry" -> "Pantry"
                 "Butchery" -> "Butchery"
                 "Beverages" -> "Beverages"
+                "SweetsNuts" -> "Nuts & Sweets"
+                "HerbalDrinks" -> "Tea & Herbal Drinks"
                 "Household" -> "Household"
                 else -> "Other"
             }
@@ -51,6 +55,8 @@ object LocalizationUtil {
         "Pantry",
         "Butchery",
         "Beverages",
+        "SweetsNuts",
+        "HerbalDrinks",
         "Household"
     )
 }
