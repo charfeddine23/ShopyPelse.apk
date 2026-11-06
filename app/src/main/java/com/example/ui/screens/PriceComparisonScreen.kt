@@ -1,6 +1,15 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -14,6 +23,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,36 +34,59 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.MarketPrice
 import com.example.data.model.StoreBasketSummary
@@ -80,15 +113,10 @@ import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.viewmodel.ShoppingViewModel
 import com.example.util.LocalizationUtil
-
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Sync
-import androidx.compose.ui.draw.rotate
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -103,37 +131,147 @@ fun PriceComparisonScreen(
     val allPrices by viewModel.marketPrices.collectAsStateWithLifecycle()
     val basketSummaries by viewModel.basketSummaries.collectAsStateWithLifecycle()
     val shoppingItems by viewModel.shoppingItems.collectAsStateWithLifecycle()
+    val syncIntervalHours by viewModel.syncIntervalHours.collectAsStateWithLifecycle()
     val lastSyncTime by viewModel.lastPriceSyncTimestamp.collectAsStateWithLifecycle()
     val isSyncingPrices by viewModel.isSyncingPrices.collectAsStateWithLifecycle()
     val updatedCount by viewModel.updatedItemsCount.collectAsStateWithLifecycle()
-
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
-    var searchQuery by remember { mutableStateOf("") }
+
     var reportItemDialog by remember { mutableStateOf<MarketPrice?>(null) }
 
-    // Group prices by product barcode, prioritizing search query if user types, else category filter
-    val groupedProducts = remember(allPrices, searchQuery, selectedCategory) {
-        val filtered = if (searchQuery.isNotBlank()) {
-            // When searching: bring all matching products across all categories
-            allPrices.filter {
-                it.itemName.contains(searchQuery, ignoreCase = true) ||
-                it.itemNameAr.contains(searchQuery, ignoreCase = true) ||
-                it.barcode.contains(searchQuery)
+    val filteredPrices = remember(allPrices, searchQuery, selectedCategory) {
+        allPrices.filter { price ->
+            val matchesCategory = if (selectedCategory == "All") true else viewModel.autoCategorize(price.itemName, price.itemNameAr) == selectedCategory
+            val matchesSearch = if (searchQuery.isBlank()) true else {
+                price.itemName.contains(searchQuery, ignoreCase = true) ||
+                price.itemNameAr.contains(searchQuery, ignoreCase = true) ||
+                price.barcode.contains(searchQuery)
             }
-        } else if (selectedCategory == "All") {
-            allPrices
-        } else {
-            // Classify by category
-            allPrices.filter { price ->
-                viewModel.autoCategorize(price.itemName).equals(selectedCategory, ignoreCase = true)
-            }
+            matchesCategory && matchesSearch
         }
-        filtered.groupBy { it.barcode }
+    }
+    val groupedProducts = remember(filteredPrices) {
+        filteredPrices.groupBy { it.barcode }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
+    val pullThreshold = with(density) { 72.dp.toPx() }
+    val maxPullPx = with(density) { 150.dp.toPx() }
+
+    var pullOffset by remember { mutableFloatStateOf(0f) }
+    var holdProgress by remember { mutableFloatStateOf(0f) }
+    var isPastThreshold by remember { mutableStateOf(false) }
+    var showUpdateSettingsDialog by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    var timerJob by remember { mutableStateOf<Job?>(null) }
+
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (available.y < 0 && pullOffset > 0f) {
+                    val consumed = available.y.coerceAtLeast(-pullOffset)
+                    pullOffset = (pullOffset + consumed).coerceAtLeast(0f)
+                    if (pullOffset < pullThreshold) {
+                        isPastThreshold = false
+                        timerJob?.cancel()
+                        timerJob = null
+                        holdProgress = 0f
+                    }
+                    return Offset(0f, consumed)
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                if (available.y > 0 && source == NestedScrollSource.UserInput) {
+                    val newOffset = (pullOffset + available.y * 0.45f).coerceAtMost(maxPullPx)
+                    pullOffset = newOffset
+
+                    if (pullOffset >= pullThreshold && !isPastThreshold && !showUpdateSettingsDialog) {
+                        isPastThreshold = true
+                        timerJob?.cancel()
+                        timerJob = coroutineScope.launch {
+                            val start = System.currentTimeMillis()
+                            while (isActive) {
+                                val elapsed = System.currentTimeMillis() - start
+                                holdProgress = (elapsed / 1000f).coerceIn(0f, 1f)
+                                if (elapsed >= 1000L) {
+                                    try {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    } catch (_: Exception) {}
+                                    showUpdateSettingsDialog = true
+                                    holdProgress = 0f
+                                    isPastThreshold = false
+                                    animate(pullOffset, 0f) { v, _ -> pullOffset = v }
+                                    timerJob = null
+                                    break
+                                }
+                                delay(16L)
+                            }
+                        }
+                    }
+                    return Offset(0f, available.y)
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                val wasPast = isPastThreshold
+                val openedSettings = showUpdateSettingsDialog
+                timerJob?.cancel()
+                timerJob = null
+                val progress = holdProgress
+                holdProgress = 0f
+                isPastThreshold = false
+
+                if (wasPast && !openedSettings && progress < 1f) {
+                    try {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    } catch (_: Exception) {}
+                    viewModel.refreshEssentialPrices()
+                }
+
+                animate(pullOffset, 0f) { v, _ -> pullOffset = v }
+                return Velocity.Zero
+            }
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .nestedScroll(nestedScrollConnection)
+    ) {
+        // Floating Pull-To-Refresh / Hold-for-Settings Indicator
+        if (pullOffset > 10f || isSyncingPrices) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp)
+                    .align(Alignment.TopCenter)
+                    .zIndex(10f),
+                contentAlignment = Alignment.Center
+            ) {
+                PullIndicatorPill(
+                    pullOffset = pullOffset,
+                    threshold = pullThreshold,
+                    holdProgress = holdProgress,
+                    isSyncing = isSyncingPrices,
+                    isArabic = isArabic
+                )
+            }
+        }
+
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .offset { IntOffset(0, pullOffset.toInt().coerceAtMost(200)) },
             contentPadding = PaddingValues(bottom = 96.dp, top = 8.dp)
         ) {
             // Header Bar
@@ -168,13 +306,13 @@ fun PriceComparisonScreen(
 
                     Column {
                         Text(
-                            text = if (isArabic) "مقارنة الأسعار وسلة التسوق" else "Market Price Comparison",
+                            text = if (isArabic) "المنتجات" else "Products",
                             color = TextPrimary,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = if (isArabic) "مقارنة أسعار المتاجر الكبرى في الجزائر" else "Compare nearby supermarkets in Algeria",
+                            text = if (isArabic) "قائمة المنتجات والأسعار المباشرة في الجزائر" else "Algerian Products & Direct Supermarket Prices",
                             color = TextSecondary,
                             fontSize = 12.sp
                         )
@@ -187,7 +325,7 @@ fun PriceComparisonScreen(
                 val isLight = MaterialTheme.colorScheme.background == BackgroundLight
                 OutlinedTextField(
                     value = searchQuery,
-                    onValueChange = { searchQuery = it },
+                    onValueChange = { viewModel.setSearchQuery(it) },
                     placeholder = {
                         Text(
                             if (isArabic) "ابحث عن منتج (مثال: حليب، إيليو، قهوة...)" else "Search products (e.g., Milk, Oil, Coffee...)",
@@ -218,13 +356,14 @@ fun PriceComparisonScreen(
                 )
             }
 
-            // 12-Hour Automated Essential Product Price Sync Card
+            // Products Auto-Sync Banner (Without "Update Now" button - Pull to refresh & Hold for Settings)
             item {
-                AutoPriceSyncCard(
+                ProductsSyncInfoBanner(
                     lastSyncTime = lastSyncTime,
+                    syncIntervalHours = syncIntervalHours,
                     isSyncing = isSyncingPrices,
                     isArabic = isArabic,
-                    onManualRefresh = { viewModel.refreshEssentialPrices() },
+                    onOpenSettings = { showUpdateSettingsDialog = true },
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                 )
             }
@@ -349,18 +488,160 @@ fun PriceComparisonScreen(
             }
         )
     }
+
+    if (showUpdateSettingsDialog) {
+        UpdateSettingsSheet(
+            lastSyncTime = lastSyncTime,
+            syncIntervalHours = syncIntervalHours,
+            updatedCount = updatedCount,
+            totalProductsCount = allPrices.map { it.barcode }.distinct().size,
+            isSyncing = isSyncingPrices,
+            isArabic = isArabic,
+            onDismiss = { showUpdateSettingsDialog = false },
+            onSelectInterval = { hours -> viewModel.setSyncIntervalHours(hours) },
+            onForceRefresh = {
+                viewModel.refreshEssentialPrices()
+                showUpdateSettingsDialog = false
+            }
+        )
+    }
 }
 
 @Composable
-private fun AutoPriceSyncCard(
-    lastSyncTime: Long,
+fun PullIndicatorPill(
+    pullOffset: Float,
+    threshold: Float,
+    holdProgress: Float,
     isSyncing: Boolean,
     isArabic: Boolean,
-    onManualRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val isLight = MaterialTheme.colorScheme.background == BackgroundLight
-    val infiniteTransition = rememberInfiniteTransition(label = "sync_rotation")
+    val pillBg = if (isLight) Color.White.copy(alpha = 0.95f) else Color(0xFF0F1A2E).copy(alpha = 0.95f)
+    val isHoldActive = holdProgress > 0f
+    val borderColor = if (isHoldActive) NeonAmber else ElectricCyan
+
+    val infiniteTransition = rememberInfiniteTransition(label = "sync_spin")
+    val spinRotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900, easing = LinearEasing)
+        ),
+        label = "spin"
+    )
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(24.dp))
+            .background(pillBg)
+            .border(BorderStroke(1.5.dp, borderColor.copy(alpha = 0.7f)), RoundedCornerShape(24.dp))
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .testTag("pull_indicator_pill")
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            if (isSyncing) {
+                Icon(
+                    imageVector = Icons.Default.Sync,
+                    contentDescription = "Syncing",
+                    tint = ElectricCyan,
+                    modifier = Modifier
+                        .size(18.dp)
+                        .rotate(spinRotation)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isArabic) "جاري تحديث أسعار المنتجات..." else "Updating products prices...",
+                    color = TextPrimary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            } else if (holdProgress >= 1f) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Settings",
+                    tint = NeonAmber,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isArabic) "جاري فتح إعدادات التحديث..." else "Opening update settings...",
+                    color = NeonAmber,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            } else if (isHoldActive) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(20.dp)
+                ) {
+                    CircularProgressIndicator(
+                        progress = { holdProgress },
+                        strokeWidth = 2.5.dp,
+                        color = NeonAmber,
+                        trackColor = Color(0x33FFAA00),
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Hold",
+                        tint = NeonAmber,
+                        modifier = Modifier.size(12.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isArabic) "استمر ثانية لفتح الإعدادات..." else "Hold 1s for Update Settings...",
+                    color = NeonAmber,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            } else if (pullOffset >= threshold) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Release to refresh",
+                    tint = ElectricCyan,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isArabic) "أفلت للتحديث • أو واصل السحب ثانية للإعدادات" else "Release to update • Or hold 1s for Settings",
+                    color = ElectricCyan,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.ArrowDownward,
+                    contentDescription = "Pull",
+                    tint = TextSecondary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isArabic) "اسحب للتحديث..." else "Pull down to refresh...",
+                    color = TextSecondary,
+                    fontSize = 12.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ProductsSyncInfoBanner(
+    lastSyncTime: Long,
+    syncIntervalHours: Int,
+    isSyncing: Boolean,
+    isArabic: Boolean,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+    val infiniteTransition = rememberInfiniteTransition(label = "banner_sync")
     val rotation by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
@@ -381,7 +662,7 @@ private fun AutoPriceSyncCard(
     LiquidGlassCard(
         modifier = modifier
             .fillMaxWidth()
-            .testTag("auto_price_sync_card"),
+            .testTag("products_sync_banner"),
         glowColor = ElectricCyan
     ) {
         Row(
@@ -397,7 +678,7 @@ private fun AutoPriceSyncCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(42.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(
                             if (isLight) CyanTintBg else ElectricCyan.copy(alpha = 0.16f)
@@ -413,7 +694,7 @@ private fun AutoPriceSyncCard(
                         contentDescription = "Sync",
                         tint = if (isLight) CyanTintText else ElectricCyan,
                         modifier = Modifier
-                            .size(20.dp)
+                            .size(22.dp)
                             .then(if (isSyncing) Modifier.rotate(rotation) else Modifier)
                     )
                 }
@@ -423,51 +704,339 @@ private fun AutoPriceSyncCard(
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = if (isArabic) "تحديث تلقائي كل 12 ساعة" else "Auto-Updates Every 12 Hours",
+                            text = if (isArabic) "التحديث الذكي: كل $syncIntervalHours ساعات" else "Auto-Sync: Every $syncIntervalHours Hours",
                             color = TextPrimary,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         NeonBadge(
-                            text = "12H",
+                            text = "${syncIntervalHours}H",
                             accentColor = ElectricCyan
                         )
                     }
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = if (isSyncing) {
-                            if (isArabic) "جاري مسح وتحديث أسعار المنتجات الأساسية..." else "Scanning & updating essential products..."
+                            if (isArabic) "جاري مسح وتحديث أسعار المنتجات..." else "Scanning & updating product prices..."
                         } else {
-                            if (isArabic) "آخر مسح لأسعار السلع الأساسية: $timeFormatted" else "Last essential scan: $timeFormatted"
+                            if (isArabic) "آخر تحديث: $timeFormatted" else "Last update: $timeFormatted"
                         },
                         color = if (isSyncing) ElectricCyan else TextSecondary,
                         fontSize = 11.sp
+                    )
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Text(
+                        text = if (isArabic) "⬇️ اسحب لأسفل للتحديث • انتظر ثانية للإعدادات" else "⬇️ Pull to refresh • Hold 1s for Settings",
+                        color = if (isLight) Color(0xFF007799) else ElectricCyan.copy(alpha = 0.85f),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Manual Refresh Pill Button
-            val refreshBg = if (isLight) CyanTintBg else Color(0x2200E5FF)
-            val refreshBorder = if (isLight) BorderStroke(1.dp, CyanTintBorder) else BorderStroke(1.dp, ElectricCyan.copy(alpha = 0.4f))
+            // Settings button to open Settings directly
+            val gearBg = if (isLight) CyanTintBg else Color(0x2200E5FF)
+            val gearBorder = if (isLight) BorderStroke(1.dp, CyanTintBorder) else BorderStroke(1.dp, ElectricCyan.copy(alpha = 0.4f))
 
-            Box(
+            IconButton(
+                onClick = onOpenSettings,
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
-                    .background(refreshBg)
-                    .border(refreshBorder, RoundedCornerShape(10.dp))
-                    .clickable(enabled = !isSyncing, onClick = onManualRefresh)
-                    .padding(horizontal = 10.dp, vertical = 7.dp)
-                    .testTag("manual_sync_button"),
-                contentAlignment = Alignment.Center
+                    .background(gearBg)
+                    .border(gearBorder, RoundedCornerShape(10.dp))
+                    .size(38.dp)
+                    .testTag("open_update_settings_btn")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Update Settings",
+                    tint = if (isLight) CyanTintText else ElectricCyan,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun UpdateSettingsSheet(
+    lastSyncTime: Long,
+    syncIntervalHours: Int,
+    updatedCount: Int,
+    totalProductsCount: Int,
+    isSyncing: Boolean,
+    isArabic: Boolean,
+    onDismiss: () -> Unit,
+    onSelectInterval: (Int) -> Unit,
+    onForceRefresh: () -> Unit
+) {
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetBg = if (isLight) Color.White else Color(0xFF0D1627)
+
+    val dateFormat = remember(isArabic) {
+        val locale = if (isArabic) Locale("ar") else Locale.ENGLISH
+        SimpleDateFormat("HH:mm - yyyy/MM/dd", locale)
+    }
+    val timeFormatted = remember(lastSyncTime, dateFormat) {
+        dateFormat.format(Date(lastSyncTime))
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = sheetBg,
+        tonalElevation = 8.dp,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(top = 12.dp, bottom = 8.dp)
+                    .size(width = 44.dp, height = 4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(if (isLight) Color(0xFFD0D7DE) else Color(0x40FFFFFF))
+            )
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp)
+                .testTag("update_settings_sheet")
+        ) {
+            // Header
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isLight) CyanTintBg else ElectricCyan.copy(alpha = 0.16f))
+                        .border(
+                            BorderStroke(1.dp, if (isLight) CyanTintBorder else ElectricCyan.copy(alpha = 0.4f)),
+                            RoundedCornerShape(12.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Settings",
+                        tint = if (isLight) CyanTintText else ElectricCyan,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column {
+                    Text(
+                        text = if (isArabic) "إعدادات تحديث الأسعار" else "Price Update Settings",
+                        color = TextPrimary,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (isArabic) "تخصيص فترة التحديث وطرق السحب" else "Customize refresh intervals & gestures",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Gesture Tutorial Card
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(if (isLight) Color(0xFFF0F7FF) else Color(0xFF132038))
+                    .border(
+                        BorderStroke(1.dp, if (isLight) Color(0xFFCCE4FF) else ElectricCyan.copy(alpha = 0.25f)),
+                        RoundedCornerShape(14.dp)
+                    )
+                    .padding(14.dp)
+            ) {
+                Column {
+                    Text(
+                        text = if (isArabic) "كيفية التحكم بحركات السحب:" else "How to use pull gestures:",
+                        color = if (isLight) Color(0xFF005580) else ElectricCyan,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.Top) {
+                        Text("⬇️ ", fontSize = 13.sp)
+                        Text(
+                            text = if (isArabic) "سحب سريع من الأعلى لأسفل: تحديث مباشر وفوري لأسعار المنتجات في الصفحة."
+                            else "Quick pull down: Instant update of product prices in the page.",
+                            color = TextPrimary,
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.Top) {
+                        Text("⏳ ", fontSize = 13.sp)
+                        Text(
+                            text = if (isArabic) "سحب مع الانتظار لمدة ثانية واحدة (1s): يفتح نافذة إعدادات التحديث هذه تلقائيًا."
+                            else "Pull and hold for 1 second: Automatically opens this Update Settings modal.",
+                            color = TextPrimary,
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Refresh Interval Title
+            Text(
+                text = if (isArabic) "التكرار التلقائي للتحديث:" else "Auto-Refresh Frequency:",
+                color = TextPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Interval options: 6 hours, 12 hours, 24 hours
+            val intervals = listOf(
+                Triple(6, if (isArabic) "كل 6 ساعات" else "Every 6 Hours", if (isArabic) "تحديث سريع ومتكرر" else "Fast & frequent"),
+                Triple(12, if (isArabic) "كل 12 ساعة (افتراضي)" else "Every 12 Hours (Default)", if (isArabic) "توازن مثالي بين الدقة والبطارية" else "Balanced accuracy & battery"),
+                Triple(24, if (isArabic) "كل 24 ساعة" else "Every 24 Hours", if (isArabic) "تحديث يومي اقتصادي" else "Economical daily refresh")
+            )
+
+            intervals.forEach { (hours, title, desc) ->
+                val isSelected = syncIntervalHours == hours
+                val optionBg = if (isSelected) {
+                    if (isLight) CyanTintBg else ElectricCyan.copy(alpha = 0.15f)
+                } else {
+                    if (isLight) Color(0xFFFAFAFA) else Color(0x0EFFFFFF)
+                }
+                val optionBorder = if (isSelected) {
+                    BorderStroke(1.5.dp, if (isLight) CyanTintBorder else ElectricCyan)
+                } else {
+                    BorderStroke(1.dp, if (isLight) LightCardBorder else Color(0x1AFFFFFF))
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(optionBg)
+                        .border(optionBorder, RoundedCornerShape(12.dp))
+                        .clickable { onSelectInterval(hours) }
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                        .testTag("interval_option_$hours"),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = isSelected,
+                        onClick = { onSelectInterval(hours) },
+                        colors = RadioButtonDefaults.colors(
+                            selectedColor = if (isLight) CyanTintText else ElectricCyan,
+                            unselectedColor = TextSecondary
+                        )
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = title,
+                            color = TextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        )
+                        Text(
+                            text = desc,
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
+                    }
+                    if (isSelected) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = "Selected",
+                            tint = if (isLight) CyanTintText else ElectricCyan,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Last Update Status Banner
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (isArabic) "تحديث الآن" else "Update Now",
-                    color = if (isLight) CyanTintText else ElectricCyan,
-                    fontSize = 11.sp,
+                    text = if (isArabic) "آخر فحص لأسعار السلع:" else "Last Price Check:",
+                    color = TextSecondary,
+                    fontSize = 12.sp
+                )
+                Text(
+                    text = timeFormatted,
+                    color = TextPrimary,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (isArabic) "السلع المحدثة حالياً:" else "Currently Updated Items:",
+                    color = TextSecondary,
+                    fontSize = 12.sp
+                )
+                Text(
+                    text = if (isArabic) "$updatedCount من أصل $totalProductsCount" else "$updatedCount of $totalProductsCount",
+                    color = ElectricCyan,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Bottom Action: Force Refresh & Close
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                GlowingActionButton(
+                    text = if (isArabic) "تحديث الآن يدويًا" else "Force Refresh Now",
+                    onClick = onForceRefresh,
+                    modifier = Modifier.weight(1.2f),
+                    icon = Icons.Default.Refresh,
+                    color = ElectricCyan
+                )
+
+                GlowingActionButton(
+                    text = if (isArabic) "إغلاق" else "Close",
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(0.8f),
+                    icon = Icons.Default.Check,
+                    color = NeonAmber
                 )
             }
         }

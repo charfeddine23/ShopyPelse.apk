@@ -75,7 +75,7 @@ val LiquidGlassShapes = Shapes(
 )
 
 @Composable
-fun ShopyPelseTheme(
+fun ShopyPulseTheme(
     darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {
@@ -89,11 +89,19 @@ fun ShopyPelseTheme(
     )
 }
 
-// Backward compatibility alias
+// Backward compatibility aliases
+@Composable
+fun ShopyPelseTheme(
+    darkTheme: Boolean = true,
+    content: @Composable () -> Unit
+) {
+    ShopyPulseTheme(darkTheme = darkTheme, content = content)
+}
+
 @Composable
 fun SoukSmartTheme(
     darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    ShopyPelseTheme(darkTheme = darkTheme, content = content)
+    ShopyPulseTheme(darkTheme = darkTheme, content = content)
 }

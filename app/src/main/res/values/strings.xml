@@ -1,10 +1,10 @@
 <resources>
-    <string name="app_name">ShopyPelse</string>
+    <string name="app_name">Shopy Pulse</string>
     <string name="currency_dzd">د.ج</string>
     <string name="currency_dzd_latin">DA</string>
     <string name="best_value">أفضل سعر</string>
     <string name="shopping_list">قائمة التسوق</string>
-    <string name="price_comparison">مقارنة الأسعار</string>
+    <string name="price_comparison">المنتجات</string>
     <string name="scanner">الماسح الضوئي</string>
     <string name="supermarket_mode">وضع السوبرماركت</string>
 
@@ -12,6 +12,6 @@
     <string name="nav_settings">Settings</string>
     <string name="nav_cart">Cart</string>
     <string name="nav_home">Home</string>
-    <string name="nav_products">Products</string>
+    <string name="nav_products">المنتجات</string>
     <string name="nav_profile">Profile</string>
 </resources>

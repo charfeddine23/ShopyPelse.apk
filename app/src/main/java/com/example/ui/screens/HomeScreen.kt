@@ -51,6 +51,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
@@ -128,6 +129,13 @@ fun HomeScreen(
         }
     }
 
+    // Auto-reset category filter if all items in selected category were removed
+    LaunchedEffect(items) {
+        if (selectedCategory != "All" && items.none { it.category.equals(selectedCategory, ignoreCase = true) }) {
+            viewModel.setSelectedCategory("All")
+        }
+    }
+
     val stats = remember(items) { viewModel.calculateStats(items) }
     val bestStore = remember(basketSummaries) { basketSummaries.firstOrNull { it.isBestValue } }
 
@@ -164,14 +172,14 @@ fun HomeScreen(
                 )
             }
 
-            // Category Filter Chips (Tapping a category filters and navigates to products in that category)
+            // Category Filter Chips (Filters ONLY the items present in the shopping list in-place)
             item {
                 CategoryChipsSection(
+                    items = items,
                     selectedCategory = selectedCategory,
                     isArabic = isArabic,
                     onSelectCategory = { category ->
                         viewModel.setSelectedCategory(category)
-                        onNavigateToPriceComparison()
                     }
                 )
             }
@@ -286,6 +294,7 @@ fun HomeScreen(
                 onDismiss = {
                     scope.launch { sheetState.hide() }.invokeOnCompletion { showAddDialog = false }
                 },
+                onAutoCategorize = { n, na -> viewModel.autoCategorize(n, na) },
                 onAddItem = { name, nameAr, category, qty, unit, barcode, price ->
                     viewModel.addItem(name, nameAr, category, qty, unit, barcode, price)
                     scope.launch { sheetState.hide() }.invokeOnCompletion { showAddDialog = false }
@@ -315,7 +324,7 @@ private fun HomeHeader(
     ) {
         Column {
             Text(
-                text = if (isArabic) "شوبي بلس" else "ShopyPelse",
+                text = if (isArabic) "شوبي بلس" else "Shopy Pulse",
                 color = TextPrimary,
                 fontSize = 26.sp,
                 fontWeight = FontWeight.ExtraBold,
@@ -563,11 +572,26 @@ private fun FrequentItemsSection(
 
 @Composable
 private fun CategoryChipsSection(
+    items: List<ShoppingItem>,
     selectedCategory: String,
     isArabic: Boolean,
     onSelectCategory: (String) -> Unit
 ) {
     val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+
+    // Filter categories to only those that exist in the shopping list
+    val presentCategories = remember(items) {
+        items.map { it.category }.filter { it.isNotBlank() }.distinct()
+    }
+
+    // Always show "All", and only categories that have items in the current list
+    val categoriesToShow = remember(presentCategories) {
+        if (presentCategories.isEmpty()) {
+            listOf("All")
+        } else {
+            listOf("All") + presentCategories
+        }
+    }
 
     Row(
         modifier = Modifier
@@ -576,13 +600,20 @@ private fun CategoryChipsSection(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        LocalizationUtil.allCategories.forEach { category ->
+        categoriesToShow.forEach { category ->
             val isSelected = selectedCategory == category
-            val label = if (category == "All") {
+            val count = if (category == "All") {
+                items.size
+            } else {
+                items.count { it.category.equals(category, ignoreCase = true) }
+            }
+
+            val baseLabel = if (category == "All") {
                 if (isArabic) "الكل" else "All"
             } else {
                 LocalizationUtil.getCategoryLabel(category, isArabic)
             }
+            val label = "$baseLabel ($count)"
 
             val chipBg = if (isLight) {
                 if (isSelected) CyanTintBg else Color.White
@@ -867,12 +898,13 @@ fun AddItemSheetContent(
     isArabic: Boolean,
     availableProducts: List<com.example.data.model.MarketPrice> = emptyList(),
     onDismiss: () -> Unit,
+    onAutoCategorize: (name: String, nameAr: String) -> String,
     onAddItem: (name: String, nameAr: String, category: String, qty: Int, unit: String, barcode: String?, price: Double) -> Unit,
     onScanBarcode: () -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var nameAr by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("Produce") }
+    var category by remember { mutableStateOf("") }
     var quantity by remember { mutableIntStateOf(1) }
     var unit by remember { mutableStateOf("pcs") }
     var barcode by remember { mutableStateOf("") }
@@ -1000,6 +1032,7 @@ fun AddItemSheetContent(
                                 nameAr = prod.itemNameAr
                                 barcode = prod.barcode
                                 estimatedPrice = prod.priceDzd
+                                category = onAutoCategorize(prod.itemName, prod.itemNameAr)
                             }
                             .padding(horizontal = 10.dp, vertical = 6.dp)
                     ) {
@@ -1041,6 +1074,7 @@ fun AddItemSheetContent(
             onValueChange = {
                 name = it
                 if (isArabic) nameAr = it
+                category = onAutoCategorize(name, nameAr)
             },
             label = { Text(if (isArabic) "اسم المنتج المحدد" else "Selected Product Name") },
             singleLine = true,
@@ -1056,6 +1090,80 @@ fun AddItemSheetContent(
                 unfocusedTextColor = TextPrimary
             )
         )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Dynamic Category Selector & Auto-Detection Chips
+        val currentCategory = category.ifBlank { onAutoCategorize(name, nameAr) }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (isArabic) "تصنيف المنتج:" else "Product Category:",
+                    color = TextSecondary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = LocalizationUtil.getCategoryLabel(currentCategory, isArabic),
+                    color = if (isLight) CyanTintText else ElectricCyan,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            androidx.compose.foundation.lazy.LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                val selectableCats = LocalizationUtil.allCategories.filter { it != "All" }
+                items(selectableCats.size) { idx ->
+                    val cat = selectableCats[idx]
+                    val isCatSelected = (currentCategory == cat)
+                    val catLabel = LocalizationUtil.getCategoryLabel(cat, isArabic)
+                    val catBg = if (isCatSelected) {
+                        if (isLight) CyanTintBg else ElectricCyan.copy(alpha = 0.25f)
+                    } else {
+                        if (isLight) Color(0xFFF1F5F9) else Color(0x18FFFFFF)
+                    }
+                    val catBorder = if (isCatSelected) {
+                        BorderStroke(1.5.dp, if (isLight) CyanTintBorder else ElectricCyan)
+                    } else {
+                        BorderStroke(1.dp, if (isLight) LightCardBorder else Color(0x15FFFFFF))
+                    }
+                    val catTextColor = if (isCatSelected) {
+                        if (isLight) CyanTintText else ElectricCyan
+                    } else {
+                        TextSecondary
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(catBg)
+                            .border(catBorder, RoundedCornerShape(8.dp))
+                            .clickable { category = cat }
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Text(
+                            text = catLabel,
+                            color = catTextColor,
+                            fontSize = 11.sp,
+                            fontWeight = if (isCatSelected) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(10.dp))
 
@@ -1144,7 +1252,8 @@ fun AddItemSheetContent(
             enabled = name.isNotBlank(),
             onClick = {
                 if (name.isNotBlank()) {
-                    onAddItem(name, nameAr, category, quantity, unit, barcode, estimatedPrice)
+                    val finalCategory = category.ifBlank { onAutoCategorize(name, nameAr) }
+                    onAddItem(name, nameAr, finalCategory, quantity, unit, barcode, estimatedPrice)
                 }
             },
             modifier = Modifier

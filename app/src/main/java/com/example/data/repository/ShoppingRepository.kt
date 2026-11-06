@@ -17,9 +17,12 @@ class ShoppingRepository(
     val allMarketPrices: Flow<List<MarketPrice>> = marketPriceDao.getAllMarketPrices()
 
     suspend fun insertItem(item: ShoppingItem): Long {
-        val category = if (item.category.isBlank() || item.category == "Other") {
-            autoCategorize(item.name)
-        } else item.category
+        val detected = autoCategorize(item.name, item.nameAr)
+        val category = if (item.category.isBlank() || item.category == "Other" || (item.category == "Produce" && detected != "Produce")) {
+            detected
+        } else {
+            item.category
+        }
 
         // If barcode exists, try to enrich estimated price from best store
         val estimatedPrice = if (item.barcode != null && item.estimatedPriceDzd <= 0.0) {
@@ -32,6 +35,18 @@ class ShoppingRepository(
         return shoppingDao.insertItem(
             item.copy(category = category, estimatedPriceDzd = estimatedPrice)
         )
+    }
+
+    suspend fun sanitizeExistingItemCategories() {
+        val items = shoppingDao.getAllShoppingItems().first()
+        for (item in items) {
+            if (item.category.isBlank() || item.category == "Other" || item.category == "Produce") {
+                val detected = autoCategorize(item.name, item.nameAr)
+                if (detected != item.category && (item.category == "Produce" && detected != "Produce" || item.category != "Produce")) {
+                    shoppingDao.updateItem(item.copy(category = detected))
+                }
+            }
+        }
     }
 
     suspend fun updateItem(item: ShoppingItem) = shoppingDao.updateItem(item)
@@ -142,50 +157,167 @@ class ShoppingRepository(
     /**
      * Auto-categorizes an item based on English, French, and Arabic grocery keywords.
      */
-    fun autoCategorize(name: String): String {
-        val lower = name.lowercase()
+    fun autoCategorize(name: String, nameAr: String = ""): String {
+        val text = "$name $nameAr".lowercase()
         return when {
-            lower.contains("milk") || lower.contains("lait") || lower.contains("حليب") ||
-            lower.contains("cheese") || lower.contains("fromage") || lower.contains("جبن") ||
-            lower.contains("yaourt") || lower.contains("yogurt") || lower.contains("لبن") ||
-            lower.contains("egg") || lower.contains("oeuf") || lower.contains("بيض") -> "Dairy"
+            // Herbal Drinks & Teas
+            text.contains("gingembre") || text.contains("زنجبيل") ||
+            text.contains("menthe") || text.contains("نعناع") ||
+            text.contains("thym") || text.contains("زعتر") || text.contains("زعيترة") ||
+            text.contains("tisane") || text.contains("تيزانة") || text.contains("تيزانات") ||
+            text.contains("camomille") || text.contains("بابونج") ||
+            text.contains("verveine") || text.contains("لويزة") ||
+            text.contains("infusion") || text.contains("زهورات") ||
+            text.contains("anis") || text.contains("حبة حلاوة") || text.contains("يانسون") ||
+            text.contains("tea") || text.contains("thé") || text.contains("شاي") || text.contains("تاي") || text.contains("أتاي") -> "HerbalDrinks"
 
-            lower.contains("tomato") || lower.contains("tomate") || lower.contains("طماطم") ||
-            lower.contains("potato") || lower.contains("pomme de terre") || lower.contains("بطاطا") ||
-            lower.contains("onion") || lower.contains("oignon") || lower.contains("بصل") ||
-            lower.contains("apple") || lower.contains("pomme") || lower.contains("تفاح") ||
-            lower.contains("banana") || lower.contains("banane") || lower.contains("موز") ||
-            lower.contains("orange") || lower.contains("برتقال") || lower.contains("lemon") || lower.contains("citron") || lower.contains("ليمون") -> "Produce"
+            // Sweets & Nuts
+            text.contains("amande") || text.contains("لوز") ||
+            text.contains("pistache") || text.contains("فستق") ||
+            text.contains("noisette") || text.contains("بندق") ||
+            text.contains("cacahuete") || text.contains("cacahuète") || text.contains("كاوكاو") ||
+            text.contains("noix") || text.contains("جوز") ||
+            text.contains("cajou") || text.contains("كاجو") ||
+            text.contains("sesame") || text.contains("جلجلان") || text.contains("سمسم") ||
+            text.contains("nut") || text.contains("مكسرات") ||
+            text.contains("bonbon") || text.contains("حلوى") || text.contains("سكاكر") ||
+            text.contains("chocolat") || text.contains("chocolate") || text.contains("شوكولا") || text.contains("شوكولاتة") ||
+            text.contains("biscuit") || text.contains("بسكويت") || text.contains("gaufrette") || text.contains("غوفرات") ||
+            text.contains("halwa") || text.contains("halva") || text.contains("حلوة الترك") || text.contains("شامية") ||
+            text.contains("gateau") || text.contains("gâteau") || text.contains("قاطو") || text.contains("حلويات") ||
+            text.contains("makroud") || text.contains("مقروط") || text.contains("baklawa") || text.contains("بقلاوة") ||
+            text.contains("qalb louz") || text.contains("قلب اللوز") || text.contains("zlabia") || text.contains("زلابية") ||
+            text.contains("caramel") || text.contains("كراميل") || text.contains("nougat") || text.contains("نوغة") ||
+            text.contains("sablé") || text.contains("صابلي") -> "SweetsNuts"
 
-            lower.contains("bread") || lower.contains("pain") || lower.contains("خبز") ||
-            lower.contains("baguette") || lower.contains("باقيت") || lower.contains("croissant") || lower.contains("كرواسون") ||
-            lower.contains("brioche") || lower.contains("بريوش") -> "Bakery"
+            // Dairy & Cheese
+            text.contains("milk") || text.contains("lait") || text.contains("حليب") ||
+            text.contains("cheese") || text.contains("fromage") || text.contains("جبن") || text.contains("جبنة") || text.contains("أجبان") || text.contains("فرماج") ||
+            text.contains("yaourt") || text.contains("yogurt") || text.contains("ياغورت") ||
+            text.contains("butter") || text.contains("beurre") || text.contains("زبدة") ||
+            text.contains("crème") || text.contains("creme") || text.contains("cream") || text.contains("قشطة") || text.contains("كريمة") ||
+            text.contains("leben") || text.contains("laban") || text.contains("لبن") ||
+            text.contains("rayeb") || text.contains("رايب") ||
+            text.contains("camembert") || text.contains("gruyere") || text.contains("gruyère") || text.contains("غرويير") ||
+            text.contains("mozzarella") || text.contains("موزاريلا") || text.contains("edam") || text.contains("cheddar") || text.contains("شيدر") ||
+            text.contains("berbere") || text.contains("berbère") || text.contains("بربر") ||
+            text.contains("tartino") || text.contains("تارتينو") ||
+            text.contains("kiri") || text.contains("كيري") ||
+            text.contains("vache qui rit") || text.contains("البقرة الضاحكة") ||
+            text.contains("egg") || text.contains("oeuf") || text.contains("بيض") -> "Dairy"
 
-            lower.contains("chicken") || lower.contains("poulet") || lower.contains("دجاج") ||
-            lower.contains("meat") || lower.contains("viande") || lower.contains("لحم") ||
-            lower.contains("steak") || lower.contains("escalope") || lower.contains("كفتة") ||
-            lower.contains("fish") || lower.contains("poisson") || lower.contains("سمك") -> "Butchery"
+            // Bakery
+            text.contains("bread") || text.contains("pain") || text.contains("خبز") ||
+            text.contains("baguette") || text.contains("باقيت") || text.contains("باكيط") ||
+            text.contains("croissant") || text.contains("كرواسون") ||
+            text.contains("brioche") || text.contains("بريوش") ||
+            text.contains("toast") || text.contains("توست") ||
+            text.contains("biscotte") || text.contains("بسكوت") ||
+            text.contains("matlouh") || text.contains("مطلوع") ||
+            text.contains("kesra") || text.contains("كسرة") ||
+            text.contains("msemen") || text.contains("مسمن") ||
+            text.contains("mahjouba") || text.contains("محاجب") ||
+            text.contains("galette") || text.contains("بغرير") -> "Bakery"
 
-            lower.contains("amande") || lower.contains("لوز") || lower.contains("pistache") || lower.contains("فستق") ||
-            lower.contains("noisette") || lower.contains("بندق") || lower.contains("cacahuete") || lower.contains("كاوكاو") ||
-            lower.contains("noix") || lower.contains("جوز") || lower.contains("nut") || lower.contains("مكسرات") ||
-            lower.contains("bonbon") || lower.contains("حلوى") || lower.contains("chocolat") || lower.contains("شوكولا") ||
-            lower.contains("halwa") || lower.contains("حلوة الترك") || lower.contains("gateau") || lower.contains("حلويات") -> "SweetsNuts"
+            // Butchery & Meat & Fish
+            text.contains("chicken") || text.contains("poulet") || text.contains("دجاج") || text.contains("بولي") ||
+            text.contains("meat") || text.contains("viande") || text.contains("لحم") || text.contains("لحوم") ||
+            text.contains("beef") || text.contains("boeuf") || text.contains("bœuf") || text.contains("بقر") || text.contains("بقري") || text.contains("عجل") ||
+            text.contains("lamb") || text.contains("agneau") || text.contains("mouton") || text.contains("خروف") || text.contains("غنم") || text.contains("غنمي") ||
+            text.contains("turkey") || text.contains("dinde") || text.contains("داند") ||
+            text.contains("steak") || text.contains("ستيك") ||
+            text.contains("escalope") || text.contains("سكالوب") ||
+            text.contains("kefta") || text.contains("kofta") || text.contains("كفتة") || text.contains("مفروم") || text.contains("مرحي") ||
+            text.contains("merguez") || text.contains("مرقاز") || text.contains("saucisse") || text.contains("نقانق") ||
+            text.contains("cachir") || text.contains("kashir") || text.contains("كاشير") || text.contains("كشير") ||
+            text.contains("fish") || text.contains("poisson") || text.contains("سمك") || text.contains("حوت") ||
+            text.contains("sardine") || text.contains("سردين") ||
+            text.contains("tuna") || text.contains("thon") || text.contains("طون") || text.contains("تونة") ||
+            text.contains("crevette") || text.contains("جمبري") || text.contains("كروفيت") -> "Butchery"
 
-            lower.contains("gingembre") || lower.contains("زنجبيل") || lower.contains("menthe") || lower.contains("نعناع") ||
-            lower.contains("thym") || lower.contains("زعتر") || lower.contains("tisane") || lower.contains("تيزانة") ||
-            lower.contains("camomille") || lower.contains("بابونج") || lower.contains("verveine") || lower.contains("لويزة") ||
-            lower.contains("tea") || lower.contains("thé") || lower.contains("شاي") -> "HerbalDrinks"
+            // Beverages
+            text.contains("water") || text.contains("eau") || text.contains("ماء") || text.contains("مياه") ||
+            text.contains("juice") || text.contains("jus") || text.contains("عصير") ||
+            text.contains("soda") || text.contains("gazouz") || text.contains("غازوز") || text.contains("مشروب") ||
+            text.contains("cola") || text.contains("كولا") ||
+            text.contains("fanta") || text.contains("فانتا") ||
+            text.contains("pepsi") || text.contains("بيبسي") ||
+            text.contains("hamoud") || text.contains("حمود") || text.contains("بوعلام") ||
+            text.contains("ifri") || text.contains("إفري") || text.contains("افري") ||
+            text.contains("ramy") || text.contains("رامي") ||
+            text.contains("rouiba") || text.contains("رويبة") ||
+            text.contains("ngaous") || text.contains("نقاوس") ||
+            text.contains("coffee") || text.contains("café") || text.contains("cafe") || text.contains("قهوة") || text.contains("نسكافيه") || text.contains("بن") -> "Beverages"
 
-            lower.contains("water") || lower.contains("eau") || lower.contains("ماء") ||
-            lower.contains("juice") || lower.contains("jus") || lower.contains("عصير") ||
-            lower.contains("soda") || lower.contains("gazouz") || lower.contains("مشروب") ||
-            lower.contains("cola") || lower.contains("fanta") || lower.contains("حمود") || lower.contains("hamoud") -> "Beverages"
+            // Household & Cleaning
+            text.contains("soap") || text.contains("savon") || text.contains("صابون") ||
+            text.contains("detergent") || text.contains("lessive") || text.contains("مسحوق") || text.contains("غسيل") ||
+            text.contains("javel") || text.contains("جافيل") || text.contains("كلور") ||
+            text.contains("isis") || text.contains("إيزيس") || text.contains("ايزيس") ||
+            text.contains("omo") || text.contains("اومو") ||
+            text.contains("ariel") || text.contains("أرييل") || text.contains("ارييل") ||
+            text.contains("pril") || text.contains("بريل") ||
+            text.contains("shampoo") || text.contains("shampoing") || text.contains("شامبو") ||
+            text.contains("toothpaste") || text.contains("dentifrice") || text.contains("معجون أسنان") ||
+            text.contains("colgate") || text.contains("كولجيت") || text.contains("signal") || text.contains("سيغنال") ||
+            text.contains("sponge") || text.contains("eponge") || text.contains("إسفنجة") || text.contains("حبلة") ||
+            text.contains("essuie-tout") || text.contains("مناديل") || text.contains("ورق مرحاض") -> "Household"
 
-            lower.contains("soap") || lower.contains("savon") || lower.contains("صابون") ||
-            lower.contains("detergent") || lower.contains("lessive") || lower.contains("مسحوق") ||
-            lower.contains("isis") || lower.contains("omoe") || lower.contains("ariel") ||
-            lower.contains("shampoo") || lower.contains("شامبو") || lower.contains("javel") || lower.contains("جافيل") -> "Household"
+            // Produce (Fruits and Vegetables)
+            text.contains("tomato") || text.contains("tomate") || text.contains("طماطم") || text.contains("طماطيش") ||
+            text.contains("potato") || text.contains("pomme de terre") || text.contains("بطاطا") ||
+            text.contains("onion") || text.contains("oignon") || text.contains("بصل") ||
+            text.contains("garlic") || text.contains("ail") || text.contains("ثوم") ||
+            text.contains("apple") || text.contains("pomme") || text.contains("تفاح") ||
+            text.contains("banana") || text.contains("banane") || text.contains("موز") || text.contains("بنان") ||
+            text.contains("orange") || text.contains("برتقال") || text.contains("تشينة") ||
+            text.contains("lemon") || text.contains("citron") || text.contains("ليمون") || text.contains("قارص") ||
+            text.contains("strawberry") || text.contains("fraise") || text.contains("فراولة") || text.contains("فريز") ||
+            text.contains("peach") || text.contains("pêche") || text.contains("peche") || text.contains("خوخ") ||
+            text.contains("apricot") || text.contains("abricot") || text.contains("مشمش") ||
+            text.contains("grape") || text.contains("raisin") || text.contains("عنب") ||
+            text.contains("watermelon") || text.contains("pastèque") || text.contains("pasteque") || text.contains("دلاع") ||
+            text.contains("melon") || text.contains("بطيخ") || text.contains("شمام") ||
+            text.contains("carrot") || text.contains("carotte") || text.contains("جزر") || text.contains("زرودية") ||
+            text.contains("cucumber") || text.contains("concombre") || text.contains("خيار") ||
+            text.contains("lettuce") || text.contains("salade") || text.contains("خس") || text.contains("سلاطة") || text.contains("سلطة") ||
+            text.contains("courgette") || text.contains("zucchini") || text.contains("كوسة") || text.contains("جريوات") || text.contains("قرعة") ||
+            text.contains("aubergine") || text.contains("باذنجان") ||
+            text.contains("poivron") || text.contains("فلفل") || text.contains("حار") ||
+            text.contains("haricot") || text.contains("لوبيا خضراء") ||
+            text.contains("petit pois") || text.contains("جلبانة") || text.contains("بسلة") ||
+            text.contains("spinach") || text.contains("épinard") || text.contains("سبانخ") || text.contains("سلق") ||
+            text.contains("navet") || text.contains("لفت") ||
+            text.contains("betterave") || text.contains("شمندر") || text.contains("بيطراف") ||
+            text.contains("date") || text.contains("deglet") || text.contains("تمر") || text.contains("تمور") || text.contains("دقلة") ||
+            text.contains("olive") || text.contains("زيتون") ||
+            text.contains("fig") || text.contains("figue") || text.contains("تين") || text.contains("كرموس") -> "Produce"
+
+            // Pantry (Pasta, Couscous, Flour, Rice, Sugar, Oil, Spices, Canned, etc.)
+            text.contains("couscous") || text.contains("كسكس") || text.contains("طعام") ||
+            text.contains("pasta") || text.contains("pâte") || text.contains("pates") || text.contains("pâtes") ||
+            text.contains("macaroni") || text.contains("ماكارونة") || text.contains("مقرونة") || text.contains("معكرونة") || text.contains("مكرونة") ||
+            text.contains("spaghetti") || text.contains("سباغيتي") ||
+            text.contains("rice") || text.contains("riz") || text.contains("أرز") || text.contains("روز") ||
+            text.contains("flour") || text.contains("farine") || text.contains("فرينة") ||
+            text.contains("semolina") || text.contains("semoule") || text.contains("سميد") || text.contains("دقيق") ||
+            text.contains("sugar") || text.contains("sucre") || text.contains("سكر") ||
+            text.contains("salt") || text.contains("sel") || text.contains("ملح") ||
+            text.contains("oil") || text.contains("huile") || text.contains("زيت") ||
+            text.contains("concentré") || text.contains("طماطم مصبرة") || text.contains("كونسونطري") ||
+            text.contains("vinaigre") || text.contains("خل") ||
+            text.contains("mayonnaise") || text.contains("مايونيز") ||
+            text.contains("moutarde") || text.contains("خردل") ||
+            text.contains("harissa") || text.contains("هريسة") ||
+            text.contains("lentille") || text.contains("lentil") || text.contains("عدس") ||
+            text.contains("pois chiche") || text.contains("chickpea") || text.contains("حمص") ||
+            text.contains("fève") || text.contains("feve") || text.contains("فول") ||
+            text.contains("epice") || text.contains("épice") || text.contains("توابل") || text.contains("بهارات") ||
+            text.contains("poivre") || text.contains("فلفل أسود") || text.contains("فلفل كحل") ||
+            text.contains("cumin") || text.contains("كمون") ||
+            text.contains("ras el hanout") || text.contains("رأس الحانوت") ||
+            text.contains("curcuma") || text.contains("كركم") ||
+            text.contains("frik") || text.contains("فريك") || text.contains("شربة") -> "Pantry"
 
             else -> "Pantry"
         }

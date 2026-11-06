@@ -76,7 +76,7 @@ jobs:
             echo "KEY_ALIAS=upload" >> $GITHUB_ENV
           else
             echo "Generating automatic signing key fallback..."
-            keytool -genkeypair -v -keystore "$KEYSTORE_FILE" -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=ShopyPelse, OU=Mobile, O=ShopyPelse, L=Algiers, ST=Algiers, C=DZ"
+            keytool -genkeypair -v -keystore "$KEYSTORE_FILE" -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=ShopyPulse, OU=Mobile, O=ShopyPulse, L=Algiers, ST=Algiers, C=DZ"
             echo "STORE_PASSWORD=android" >> $GITHUB_ENV
             echo "KEY_PASSWORD=android" >> $GITHUB_ENV
             echo "KEY_ALIAS=upload" >> $GITHUB_ENV
@@ -101,7 +101,7 @@ jobs:
       - name: Prepare Release APK Artifact
         run: |
           APK_SRC=$(find app/build/outputs/apk/release/ -name "*.apk" | head -1)
-          APK_DEST="ShopyPelse-v${{ env.VERSION_NAME }}.apk"
+          APK_DEST="ShopyPulse-v${{ env.VERSION_NAME }}.apk"
           
           if [ -f "$APK_SRC" ]; then
             cp "$APK_SRC" "$APK_DEST"
@@ -115,13 +115,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG_NAME }}
-          name: "ShopyPelse v${{ env.VERSION_NAME }} (Build ${{ env.VERSION_CODE }})"
+          name: "Shopy Pulse v${{ env.VERSION_NAME }} (Build ${{ env.VERSION_CODE }})"
           make_latest: true
           body: |
-            ### 🚀 ShopyPelse v${{ env.VERSION_NAME }} Release
+            ### 🚀 Shopy Pulse v${{ env.VERSION_NAME }} Release
             
             **Build Details:**
-            - **Release Artifact:** `ShopyPelse-v${{ env.VERSION_NAME }}.apk`
+            - **Release Artifact:** `ShopyPulse-v${{ env.VERSION_NAME }}.apk`
             - **Version Name:** `${{ env.VERSION_NAME }}`
             - **Version Code:** `${{ env.VERSION_CODE }}`
             - **Commit SHA:** `${{ github.sha }}`
@@ -136,10 +136,10 @@ jobs:
             - ⚙️ Settings: Dark/Light Mode, Language switch (Arabic RTL / English LTR), Google Drive backup
             
             #### 📲 Installation & Update Instructions:
-            1. Download the `ShopyPelse-v${{ env.VERSION_NAME }}.apk` file attached below.
+            1. Download the `ShopyPulse-v${{ env.VERSION_NAME }}.apk` file attached below.
             2. Open the APK on your Android device.
             3. This release will update directly over your existing installation without losing any shopping lists or data.
-          files: ShopyPelse-v${{ env.VERSION_NAME }}.apk
+          files: ShopyPulse-v${{ env.VERSION_NAME }}.apk
           draft: false
           prerelease: false
         env:

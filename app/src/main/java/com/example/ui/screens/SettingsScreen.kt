@@ -459,7 +459,7 @@ fun SettingsScreen(
                                     .background(EmeraldSavings.copy(alpha = 0.18f))
                                     .border(BorderStroke(1.dp, EmeraldSavings), RoundedCornerShape(12.dp))
                                     .clickable {
-                                        createDocLauncher.launch("ShopyPelse_Backup_${System.currentTimeMillis()}.json")
+                                        createDocLauncher.launch("ShopyPulse_Backup_${System.currentTimeMillis()}.json")
                                     }
                                     .padding(vertical = 10.dp),
                                 contentAlignment = Alignment.Center
@@ -619,7 +619,7 @@ fun SettingsScreen(
 
                         InfoRow(
                             label = if (isArabic) "اسم التطبيق" else "App Name",
-                            value = "ShopyPelse (شوبي بلس)"
+                            value = "Shopy Pulse (شوبي بلس)"
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))

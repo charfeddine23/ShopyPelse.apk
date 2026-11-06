@@ -75,7 +75,7 @@ import com.example.ui.screens.SupermarketModeScreen
 import com.example.ui.theme.ElectricCyan
 import com.example.ui.theme.EmeraldSavings
 import com.example.ui.theme.NeonAmber
-import com.example.ui.theme.ShopyPelseTheme
+import com.example.ui.theme.ShopyPulseTheme
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextSecondary
 import com.example.ui.viewmodel.ShoppingViewModel
@@ -112,9 +112,9 @@ class MainActivity : BaseActivity() {
             // Native window decorView LTR
             window.decorView.layoutDirection = android.view.View.LAYOUT_DIRECTION_LTR
 
-            ShopyPelseTheme(darkTheme = isDarkMode) {
+            ShopyPulseTheme(darkTheme = isDarkMode) {
                 CompositionLocalProvider(LocalLayoutDirection provides ltrDirection) {
-                    SoukSmartApp(viewModel = viewModel, isDarkMode = isDarkMode)
+                    ShopyPulseApp(viewModel = viewModel, isDarkMode = isDarkMode)
                 }
             }
         }
@@ -122,7 +122,7 @@ class MainActivity : BaseActivity() {
 }
 
 @Composable
-fun SoukSmartApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
+fun ShopyPulseApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
     var currentScreen by remember { mutableStateOf(Screen.HOME) }
     var showQrShareDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -273,11 +273,11 @@ fun LiquidGlassBottomNavBar(
 
                 NavItem(
                     icon = Icons.AutoMirrored.Filled.CompareArrows,
-                    label = if (isArabic) "الأسعار" else "Prices",
+                    label = if (isArabic) "المنتجات" else "Products",
                     isSelected = currentScreen == Screen.PRICES,
                     accentColor = EmeraldSavings,
                     onClick = { onSelectScreen(Screen.PRICES) },
-                    testTag = "nav_prices"
+                    testTag = "nav_products"
                 )
 
                 NavItem(
@@ -361,4 +361,10 @@ private fun NavItem(
             )
         }
     }
+}
+
+// Backward compatibility alias
+@Composable
+fun SoukSmartApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
+    ShopyPulseApp(viewModel = viewModel, isDarkMode = isDarkMode)
 }

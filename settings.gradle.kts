@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "ShopyPelse"
+rootProject.name = "Shopy Pulse"
 
 include(":app")

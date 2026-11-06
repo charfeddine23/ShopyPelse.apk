@@ -84,6 +84,13 @@ class ShoppingViewModel(
     private val _updatedItemsCount = MutableStateFlow<Int>(0)
     val updatedItemsCount: StateFlow<Int> = _updatedItemsCount.asStateFlow()
 
+    private val _syncIntervalHours = MutableStateFlow<Int>(12)
+    val syncIntervalHours: StateFlow<Int> = _syncIntervalHours.asStateFlow()
+
+    fun setSyncIntervalHours(hours: Int) {
+        _syncIntervalHours.value = hours
+    }
+
     val frequentPresets: List<ShoppingItem> = DatabaseInitialData.frequentPresets
 
     init {
@@ -97,10 +104,13 @@ class ShoppingViewModel(
             }
         }
 
-        // Automatic 12-hour price refresh loop
+        // Automatic 12-hour price refresh loop & initial category sanitization
         viewModelScope.launch {
             // Ensure 1000 items catalog is loaded
             repository.ensureCatalogPopulated()
+
+            // Correct any previously misclassified categories
+            repository.sanitizeExistingItemCategories()
 
             // Check immediately on launch
             refreshEssentialPricesIfDue()
@@ -117,8 +127,8 @@ class ShoppingViewModel(
         _selectedCategory.value = category
     }
 
-    fun autoCategorize(name: String): String {
-        return repository.autoCategorize(name)
+    fun autoCategorize(name: String, nameAr: String = ""): String {
+        return repository.autoCategorize(name, nameAr)
     }
 
     fun setSearchQuery(query: String) {
@@ -148,17 +158,23 @@ class ShoppingViewModel(
     fun addItem(
         name: String,
         nameAr: String = name,
-        category: String = "Pantry",
+        category: String = "",
         quantity: Int = 1,
         unit: String = "pcs",
         barcode: String? = null,
         estimatedPriceDzd: Double = 0.0
     ) {
         viewModelScope.launch {
+            val resolvedCategory = if (category.isNotBlank() && category != "Other") {
+                val detected = autoCategorize(name, nameAr)
+                if (category == "Produce" && detected != "Produce") detected else category
+            } else {
+                autoCategorize(name, nameAr)
+            }
             val item = ShoppingItem(
                 name = name.trim(),
                 nameAr = if (nameAr.isBlank()) name.trim() else nameAr.trim(),
-                category = category,
+                category = resolvedCategory,
                 quantity = quantity.coerceAtLeast(1),
                 unit = unit,
                 barcode = barcode?.trim()?.ifBlank { null },
@@ -209,8 +225,8 @@ class ShoppingViewModel(
 
     suspend fun refreshEssentialPricesIfDue() {
         val now = System.currentTimeMillis()
-        val twelveHoursMs = 12 * 60 * 60 * 1000L
-        if (now - _lastPriceSyncTimestamp.value >= twelveHoursMs) {
+        val intervalMs = _syncIntervalHours.value * 60 * 60 * 1000L
+        if (now - _lastPriceSyncTimestamp.value >= intervalMs) {
             refreshEssentialPrices()
         }
     }
@@ -324,7 +340,7 @@ class ShoppingViewModel(
     // Google Drive Backup / JSON snapshot generator
     fun generateGoogleDriveBackupPayload(): String {
         val root = JSONObject()
-        root.put("app", "ShopyPelse")
+        root.put("app", "Shopy Pulse")
         root.put("version", APP_VERSION)
         root.put("timestamp", System.currentTimeMillis())
         root.put("budgetLimit", _budgetLimitDzd.value)
