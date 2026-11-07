@@ -663,13 +663,19 @@ fun PullIndicatorPill(
     val isHoldActive = holdProgress > 0f
     val isThresholdReached = pullOffset >= threshold
 
-    val borderColor = when {
-        isHoldActive -> NeonAmber
-        isThresholdReached -> ElectricCyan
-        else -> if (isLight) CyanTintBorder else ElectricCyan.copy(alpha = 0.45f)
+    val borderBrush = when {
+        isHoldActive -> Brush.horizontalGradient(listOf(NeonAmber, Color(0xFFFFD54F), NeonAmber))
+        isThresholdReached -> Brush.horizontalGradient(listOf(ElectricCyan, Color(0xFF00FFA3), ElectricCyan))
+        else -> Brush.horizontalGradient(
+            listOf(
+                if (isLight) CyanTintBorder else ElectricCyan.copy(alpha = 0.5f),
+                if (isLight) Color(0xFF80D8FF) else Color(0xFF7000FF).copy(alpha = 0.45f),
+                if (isLight) CyanTintBorder else ElectricCyan.copy(alpha = 0.5f)
+            )
+        )
     }
 
-    val pillBg = if (isLight) Color.White.copy(alpha = 0.96f) else Color(0xFF0D172A).copy(alpha = 0.96f)
+    val pillBg = if (isLight) Color.White.copy(alpha = 0.96f) else Color(0xEE0B1426)
 
     val infiniteTransition = rememberInfiniteTransition(label = "sync_spin")
     val spinRotation by infiniteTransition.animateFloat(
@@ -683,7 +689,7 @@ fun PullIndicatorPill(
 
     val arrowBounce by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = 4f,
+        targetValue = 3f,
         animationSpec = infiniteRepeatable(
             animation = tween(600, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -693,63 +699,49 @@ fun PullIndicatorPill(
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(26.dp))
+            .clip(RoundedCornerShape(22.dp))
             .background(pillBg)
             .border(
                 BorderStroke(
-                    width = if (isThresholdReached || isHoldActive) 2.dp else 1.2.dp,
-                    color = borderColor
+                    width = if (isThresholdReached || isHoldActive) 1.5.dp else 1.dp,
+                    brush = borderBrush
                 ),
-                RoundedCornerShape(26.dp)
+                RoundedCornerShape(22.dp)
             )
-            .padding(horizontal = 18.dp, vertical = 9.dp)
+            .padding(horizontal = 14.dp, vertical = 7.dp)
             .testTag("pull_indicator_pill")
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            when {
-                isSyncing -> {
-                    Icon(
-                        imageVector = Icons.Default.Sync,
-                        contentDescription = "Syncing",
-                        tint = ElectricCyan,
-                        modifier = Modifier
-                            .size(19.dp)
-                            .rotate(spinRotation)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (isArabic) "جاري تحديث أسعار المنتجات..." else "Updating product prices...",
-                        color = TextPrimary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                holdProgress >= 1f -> {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Settings",
-                        tint = NeonAmber,
-                        modifier = Modifier.size(19.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (isArabic) "جاري فتح إعدادات التحديث..." else "Opening update settings...",
-                        color = NeonAmber,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                isHoldActive -> {
+            if (isSyncing) {
+                Icon(
+                    imageVector = Icons.Default.Sync,
+                    contentDescription = "Syncing",
+                    tint = ElectricCyan,
+                    modifier = Modifier
+                        .size(16.dp)
+                        .rotate(spinRotation)
+                )
+                Spacer(modifier = Modifier.width(7.dp))
+                Text(
+                    text = if (isArabic) "جاري تحديث أسعار المنتجات..." else "Updating product prices...",
+                    color = TextPrimary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false
+                )
+            } else {
+                if (isHoldActive) {
                     Box(
                         contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(18.dp)
                     ) {
                         CircularProgressIndicator(
                             progress = { holdProgress },
-                            strokeWidth = 2.8.dp,
+                            strokeWidth = 2.2.dp,
                             color = NeonAmber,
                             trackColor = Color(0x33FFAA00),
                             modifier = Modifier.fillMaxSize()
@@ -758,51 +750,46 @@ fun PullIndicatorPill(
                             imageVector = Icons.Default.Settings,
                             contentDescription = "Hold",
                             tint = NeonAmber,
-                            modifier = Modifier.size(12.dp)
+                            modifier = Modifier.size(10.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.width(9.dp))
-                    val remainingSec = ((1f - holdProgress) * 1.0f).coerceAtLeast(0f)
-                    Text(
-                        text = if (isArabic) "استمر ثانية للإعدادات (${String.format(java.util.Locale.US, "%.1f", remainingSec)}ث)"
-                        else "Hold 1s for Settings (${String.format(java.util.Locale.US, "%.1f", remainingSec)}s)",
-                        color = NeonAmber,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                isThresholdReached -> {
+                } else if (isThresholdReached) {
                     Icon(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = "Release to refresh",
                         tint = ElectricCyan,
-                        modifier = Modifier.size(19.dp)
+                        modifier = Modifier.size(16.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (isArabic) "أفلت للتحديث • أو واصل السحب ثانية للإعدادات" else "Release to update • Or hold 1s for Settings",
-                        color = ElectricCyan,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                else -> {
+                } else {
                     Icon(
                         imageVector = Icons.Default.ArrowDownward,
                         contentDescription = "Pull",
-                        tint = if (isLight) CyanTintText else TextSecondary,
+                        tint = if (isLight) CyanTintText else ElectricCyan,
                         modifier = Modifier
-                            .size(18.dp)
+                            .size(15.dp)
                             .offset(y = arrowBounce.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (isArabic) "اسحب للتحديث..." else "Pull down to refresh...",
-                        color = if (isLight) CyanTintText else TextSecondary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
                 }
+
+                Spacer(modifier = Modifier.width(7.dp))
+
+                val textColor = when {
+                    isHoldActive -> NeonAmber
+                    isThresholdReached -> ElectricCyan
+                    isLight -> CyanTintText
+                    else -> TextPrimary
+                }
+
+                Text(
+                    text = if (isArabic) "إسحب للتحديث أو إستمر في السحب للدخول إلى إعدادات المزامنة"
+                           else "Pull to refresh or keep pulling for sync settings",
+                    color = textColor,
+                    fontSize = 11.sp,
+                    fontWeight = if (isThresholdReached || isHoldActive) FontWeight.Bold else FontWeight.SemiBold,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
