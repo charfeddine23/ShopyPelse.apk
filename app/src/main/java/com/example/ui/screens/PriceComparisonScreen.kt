@@ -10,6 +10,12 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -190,17 +196,34 @@ fun PriceComparisonScreen(
                 source: NestedScrollSource
             ): Offset {
                 if (available.y > 0 && source == NestedScrollSource.UserInput) {
-                    val newOffset = (pullOffset + available.y * 0.45f).coerceAtMost(maxPullPx)
+                    // Realistic rubber-band drag dampening: higher pull gives organic resistance
+                    val currentPull = pullOffset
+                    val elasticResistance = (1f - (currentPull / (maxPullPx * 1.35f)).coerceIn(0f, 0.85f)) * 0.60f
+                    val newOffset = (currentPull + available.y * elasticResistance).coerceAtMost(maxPullPx)
                     pullOffset = newOffset
 
                     if (pullOffset >= pullThreshold && !isPastThreshold && !showUpdateSettingsDialog) {
                         isPastThreshold = true
+                        try {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        } catch (_: Exception) {}
+
                         timerJob?.cancel()
                         timerJob = coroutineScope.launch {
                             val start = System.currentTimeMillis()
+                            var lastHapticMilestone = 0L
                             while (isActive) {
                                 val elapsed = System.currentTimeMillis() - start
                                 holdProgress = (elapsed / 1000f).coerceIn(0f, 1f)
+
+                                // Gentle rhythmic haptic pulses during countdown
+                                if (elapsed - lastHapticMilestone >= 250L && elapsed < 900L) {
+                                    lastHapticMilestone = elapsed
+                                    try {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    } catch (_: Exception) {}
+                                }
+
                                 if (elapsed >= 1000L) {
                                     try {
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -208,7 +231,14 @@ fun PriceComparisonScreen(
                                     showUpdateSettingsDialog = true
                                     holdProgress = 0f
                                     isPastThreshold = false
-                                    animate(pullOffset, 0f) { v, _ -> pullOffset = v }
+                                    animate(
+                                        initialValue = pullOffset,
+                                        targetValue = 0f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessLow
+                                        )
+                                    ) { v, _ -> pullOffset = v }
                                     timerJob = null
                                     break
                                 }
@@ -237,7 +267,15 @@ fun PriceComparisonScreen(
                     viewModel.refreshEssentialPrices()
                 }
 
-                animate(pullOffset, 0f) { v, _ -> pullOffset = v }
+                // Ultra-smooth physical spring-back
+                animate(
+                    initialValue = pullOffset,
+                    targetValue = 0f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessLow
+                    )
+                ) { v, _ -> pullOffset = v }
                 return Velocity.Zero
             }
         }
@@ -248,6 +286,15 @@ fun PriceComparisonScreen(
             .fillMaxSize()
             .nestedScroll(nestedScrollConnection)
     ) {
+        // Dynamic Glowing Animated Background Bloom
+        DynamicPullGlowingBackground(
+            pullOffset = pullOffset,
+            threshold = pullThreshold,
+            holdProgress = holdProgress,
+            isSyncing = isSyncingPrices,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
+
         // Floating Pull-To-Refresh / Hold-for-Settings Indicator
         if (pullOffset > 10f || isSyncingPrices) {
             Box(
@@ -353,18 +400,6 @@ fun PriceComparisonScreen(
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary
                     )
-                )
-            }
-
-            // Products Auto-Sync Banner (Without "Update Now" button - Pull to refresh & Hold for Settings)
-            item {
-                ProductsSyncInfoBanner(
-                    lastSyncTime = lastSyncTime,
-                    syncIntervalHours = syncIntervalHours,
-                    isSyncing = isSyncingPrices,
-                    isArabic = isArabic,
-                    onOpenSettings = { showUpdateSettingsDialog = true },
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                 )
             }
 
@@ -507,6 +542,114 @@ fun PriceComparisonScreen(
     }
 }
 
+// Dynamic Glowing Animated Background Bloom
+@Composable
+fun DynamicPullGlowingBackground(
+    pullOffset: Float,
+    threshold: Float,
+    holdProgress: Float,
+    isSyncing: Boolean,
+    modifier: Modifier = Modifier
+) {
+    if (pullOffset <= 2f && !isSyncing) return
+
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+    val pullRatio = (pullOffset / (threshold * 1.4f)).coerceIn(0f, 1f)
+
+    val infiniteTransition = rememberInfiniteTransition(label = "aura_shimmer")
+    val pulseShimmer by infiniteTransition.animateFloat(
+        initialValue = 0.75f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+
+    // Morph glow colors based on pull phase and 1-second hold
+    val primaryGlow = when {
+        holdProgress > 0.6f -> NeonAmber
+        holdProgress > 0.1f -> Color(0xFFFFCC00)
+        pullOffset >= threshold -> ElectricCyan
+        else -> Color(0xFF00E5FF)
+    }
+
+    val secondaryGlow = when {
+        holdProgress > 0.4f -> Color(0xFFFF5500)
+        pullOffset >= threshold -> Color(0xFF00FFA3)
+        else -> Color(0xFF8B5CF6)
+    }
+
+    val baseAlpha = if (isSyncing) 0.45f else ((pullRatio * 0.6f + holdProgress * 0.4f) * pulseShimmer).coerceIn(0f, 0.95f)
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(300.dp)
+            .graphicsLayer { alpha = baseAlpha }
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val centerX = size.width / 2f
+            val centerY = (pullOffset * 0.5f).coerceAtMost(size.height * 0.6f) - 20.dp.toPx()
+            val centerOffset = Offset(centerX, centerY)
+
+            val maxRadius = size.width * (0.65f + pullRatio * 0.35f)
+
+            // 1. Ambient outer luminous halo
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        primaryGlow.copy(alpha = if (isLight) 0.35f else 0.48f),
+                        secondaryGlow.copy(alpha = if (isLight) 0.18f else 0.26f),
+                        Color.Transparent
+                    ),
+                    center = centerOffset,
+                    radius = maxRadius
+                )
+            )
+
+            // 2. Focused vibrant radiant plasma core
+            val coreRadius = 75.dp.toPx() + pullOffset * 0.9f + holdProgress * 60.dp.toPx()
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        if (holdProgress > 0.1f) NeonAmber.copy(alpha = 0.75f) else ElectricCyan.copy(alpha = 0.70f),
+                        primaryGlow.copy(alpha = 0.35f),
+                        Color.Transparent
+                    ),
+                    center = centerOffset,
+                    radius = coreRadius
+                )
+            )
+
+            // 3. Fluid neon wave light rays cascading down the top
+            val waveHeight = (pullOffset * 0.5f).coerceAtMost(80.dp.toPx())
+            val path = Path().apply {
+                moveTo(0f, 0f)
+                lineTo(0f, waveHeight * 0.6f)
+                cubicTo(
+                    size.width * 0.3f, waveHeight * 1.35f,
+                    size.width * 0.7f, waveHeight * 0.45f,
+                    size.width, waveHeight * 0.95f
+                )
+                lineTo(size.width, 0f)
+                close()
+            }
+            drawPath(
+                path = path,
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        secondaryGlow.copy(alpha = 0.25f),
+                        primaryGlow.copy(alpha = 0.55f),
+                        secondaryGlow.copy(alpha = 0.25f)
+                    )
+                )
+            )
+        }
+    }
+}
+
 @Composable
 fun PullIndicatorPill(
     pullOffset: Float,
@@ -517,249 +660,154 @@ fun PullIndicatorPill(
     modifier: Modifier = Modifier
 ) {
     val isLight = MaterialTheme.colorScheme.background == BackgroundLight
-    val pillBg = if (isLight) Color.White.copy(alpha = 0.95f) else Color(0xFF0F1A2E).copy(alpha = 0.95f)
     val isHoldActive = holdProgress > 0f
-    val borderColor = if (isHoldActive) NeonAmber else ElectricCyan
+    val isThresholdReached = pullOffset >= threshold
+
+    val borderColor = when {
+        isHoldActive -> NeonAmber
+        isThresholdReached -> ElectricCyan
+        else -> if (isLight) CyanTintBorder else ElectricCyan.copy(alpha = 0.45f)
+    }
+
+    val pillBg = if (isLight) Color.White.copy(alpha = 0.96f) else Color(0xFF0D172A).copy(alpha = 0.96f)
 
     val infiniteTransition = rememberInfiniteTransition(label = "sync_spin")
     val spinRotation by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 900, easing = LinearEasing)
+            animation = tween(durationMillis = 850, easing = LinearEasing)
         ),
         label = "spin"
     )
 
+    val arrowBounce by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "arrow_bounce"
+    )
+
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(26.dp))
             .background(pillBg)
-            .border(BorderStroke(1.5.dp, borderColor.copy(alpha = 0.7f)), RoundedCornerShape(24.dp))
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .border(
+                BorderStroke(
+                    width = if (isThresholdReached || isHoldActive) 2.dp else 1.2.dp,
+                    color = borderColor
+                ),
+                RoundedCornerShape(26.dp)
+            )
+            .padding(horizontal = 18.dp, vertical = 9.dp)
             .testTag("pull_indicator_pill")
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            if (isSyncing) {
-                Icon(
-                    imageVector = Icons.Default.Sync,
-                    contentDescription = "Syncing",
-                    tint = ElectricCyan,
-                    modifier = Modifier
-                        .size(18.dp)
-                        .rotate(spinRotation)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (isArabic) "جاري تحديث أسعار المنتجات..." else "Updating products prices...",
-                    color = TextPrimary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            } else if (holdProgress >= 1f) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "Settings",
-                    tint = NeonAmber,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (isArabic) "جاري فتح إعدادات التحديث..." else "Opening update settings...",
-                    color = NeonAmber,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            } else if (isHoldActive) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(20.dp)
-                ) {
-                    CircularProgressIndicator(
-                        progress = { holdProgress },
-                        strokeWidth = 2.5.dp,
-                        color = NeonAmber,
-                        trackColor = Color(0x33FFAA00),
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Hold",
-                        tint = NeonAmber,
-                        modifier = Modifier.size(12.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (isArabic) "استمر ثانية لفتح الإعدادات..." else "Hold 1s for Update Settings...",
-                    color = NeonAmber,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            } else if (pullOffset >= threshold) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = "Release to refresh",
-                    tint = ElectricCyan,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (isArabic) "أفلت للتحديث • أو واصل السحب ثانية للإعدادات" else "Release to update • Or hold 1s for Settings",
-                    color = ElectricCyan,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Default.ArrowDownward,
-                    contentDescription = "Pull",
-                    tint = TextSecondary,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (isArabic) "اسحب للتحديث..." else "Pull down to refresh...",
-                    color = TextSecondary,
-                    fontSize = 12.sp
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun ProductsSyncInfoBanner(
-    lastSyncTime: Long,
-    syncIntervalHours: Int,
-    isSyncing: Boolean,
-    isArabic: Boolean,
-    onOpenSettings: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
-    val infiniteTransition = rememberInfiniteTransition(label = "banner_sync")
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1000, easing = LinearEasing)
-        ),
-        label = "rotation"
-    )
-
-    val dateFormat = remember(isArabic) {
-        val locale = if (isArabic) Locale("ar") else Locale.ENGLISH
-        SimpleDateFormat("HH:mm - dd/MM", locale)
-    }
-    val timeFormatted = remember(lastSyncTime, dateFormat) {
-        dateFormat.format(Date(lastSyncTime))
-    }
-
-    LiquidGlassCard(
-        modifier = modifier
-            .fillMaxWidth()
-            .testTag("products_sync_banner"),
-        glowColor = ElectricCyan
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            if (isLight) CyanTintBg else ElectricCyan.copy(alpha = 0.16f)
-                        )
-                        .border(
-                            BorderStroke(1.dp, if (isLight) CyanTintBorder else ElectricCyan.copy(alpha = 0.4f)),
-                            RoundedCornerShape(12.dp)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
+            when {
+                isSyncing -> {
                     Icon(
                         imageVector = Icons.Default.Sync,
-                        contentDescription = "Sync",
-                        tint = if (isLight) CyanTintText else ElectricCyan,
+                        contentDescription = "Syncing",
+                        tint = ElectricCyan,
                         modifier = Modifier
-                            .size(22.dp)
-                            .then(if (isSyncing) Modifier.rotate(rotation) else Modifier)
+                            .size(19.dp)
+                            .rotate(spinRotation)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isArabic) "جاري تحديث أسعار المنتجات..." else "Updating product prices...",
+                        color = TextPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = if (isArabic) "التحديث الذكي: كل $syncIntervalHours ساعات" else "Auto-Sync: Every $syncIntervalHours Hours",
-                            color = TextPrimary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
+                holdProgress >= 1f -> {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Settings",
+                        tint = NeonAmber,
+                        modifier = Modifier.size(19.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isArabic) "جاري فتح إعدادات التحديث..." else "Opening update settings...",
+                        color = NeonAmber,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                isHoldActive -> {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.size(22.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            progress = { holdProgress },
+                            strokeWidth = 2.8.dp,
+                            color = NeonAmber,
+                            trackColor = Color(0x33FFAA00),
+                            modifier = Modifier.fillMaxSize()
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        NeonBadge(
-                            text = "${syncIntervalHours}H",
-                            accentColor = ElectricCyan
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Hold",
+                            tint = NeonAmber,
+                            modifier = Modifier.size(12.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.width(9.dp))
+                    val remainingSec = ((1f - holdProgress) * 1.0f).coerceAtLeast(0f)
                     Text(
-                        text = if (isSyncing) {
-                            if (isArabic) "جاري مسح وتحديث أسعار المنتجات..." else "Scanning & updating product prices..."
-                        } else {
-                            if (isArabic) "آخر تحديث: $timeFormatted" else "Last update: $timeFormatted"
-                        },
-                        color = if (isSyncing) ElectricCyan else TextSecondary,
-                        fontSize = 11.sp
+                        text = if (isArabic) "استمر ثانية للإعدادات (${String.format(java.util.Locale.US, "%.1f", remainingSec)}ث)"
+                        else "Hold 1s for Settings (${String.format(java.util.Locale.US, "%.1f", remainingSec)}s)",
+                        color = NeonAmber,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(3.dp))
+                }
+                isThresholdReached -> {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Release to refresh",
+                        tint = ElectricCyan,
+                        modifier = Modifier.size(19.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (isArabic) "⬇️ اسحب لأسفل للتحديث • انتظر ثانية للإعدادات" else "⬇️ Pull to refresh • Hold 1s for Settings",
-                        color = if (isLight) Color(0xFF007799) else ElectricCyan.copy(alpha = 0.85f),
-                        fontSize = 10.sp,
+                        text = if (isArabic) "أفلت للتحديث • أو واصل السحب ثانية للإعدادات" else "Release to update • Or hold 1s for Settings",
+                        color = ElectricCyan,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                else -> {
+                    Icon(
+                        imageVector = Icons.Default.ArrowDownward,
+                        contentDescription = "Pull",
+                        tint = if (isLight) CyanTintText else TextSecondary,
+                        modifier = Modifier
+                            .size(18.dp)
+                            .offset(y = arrowBounce.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isArabic) "اسحب للتحديث..." else "Pull down to refresh...",
+                        color = if (isLight) CyanTintText else TextSecondary,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            // Settings button to open Settings directly
-            val gearBg = if (isLight) CyanTintBg else Color(0x2200E5FF)
-            val gearBorder = if (isLight) BorderStroke(1.dp, CyanTintBorder) else BorderStroke(1.dp, ElectricCyan.copy(alpha = 0.4f))
-
-            IconButton(
-                onClick = onOpenSettings,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(gearBg)
-                    .border(gearBorder, RoundedCornerShape(10.dp))
-                    .size(38.dp)
-                    .testTag("open_update_settings_btn")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "Update Settings",
-                    tint = if (isLight) CyanTintText else ElectricCyan,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
         }
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
