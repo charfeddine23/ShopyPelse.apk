@@ -118,6 +118,15 @@ import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.viewmodel.ShoppingViewModel
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddShoppingCart
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import com.example.util.ProductGroup
+import com.example.util.ProductVariant
+import com.example.util.ProductGroupingUtil
 import com.example.util.LocalizationUtil
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -146,19 +155,21 @@ fun PriceComparisonScreen(
 
     var reportItemDialog by remember { mutableStateOf<MarketPrice?>(null) }
 
-    val filteredPrices = remember(allPrices, searchQuery, selectedCategory) {
-        allPrices.filter { price ->
-            val matchesCategory = if (selectedCategory == "All") true else viewModel.autoCategorize(price.itemName, price.itemNameAr) == selectedCategory
+    val productGroups = remember(allPrices, searchQuery, selectedCategory) {
+        val groups = ProductGroupingUtil.groupMarketPrices(allPrices)
+        groups.filter { group ->
+            val matchesCategory = if (selectedCategory == "All") true else group.category == selectedCategory
             val matchesSearch = if (searchQuery.isBlank()) true else {
-                price.itemName.contains(searchQuery, ignoreCase = true) ||
-                price.itemNameAr.contains(searchQuery, ignoreCase = true) ||
-                price.barcode.contains(searchQuery)
+                group.nameAr.contains(searchQuery, ignoreCase = true) ||
+                group.nameEn.contains(searchQuery, ignoreCase = true) ||
+                group.variants.any { v ->
+                    v.itemName.contains(searchQuery, ignoreCase = true) ||
+                    v.itemNameAr.contains(searchQuery, ignoreCase = true) ||
+                    v.barcode.contains(searchQuery)
+                }
             }
             matchesCategory && matchesSearch
         }
-    }
-    val groupedProducts = remember(filteredPrices) {
-        filteredPrices.groupBy { it.barcode }
     }
 
     val density = LocalDensity.current
@@ -461,7 +472,7 @@ fun PriceComparisonScreen(
                 }
             }
 
-            // Section Title: Products Catalog & Price list
+            // Section Title: Grouped Products & Auto-Categorization
             item {
                 Row(
                     modifier = Modifier
@@ -470,35 +481,47 @@ fun PriceComparisonScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = if (isArabic) "قائمة المنتجات والأسعار المباشرة" else "Direct Products & Prices Catalog",
-                        color = TextPrimary,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Column {
+                        Text(
+                            text = if (isArabic) "مجموعات المنتجات والأسعار" else "Grouped Products & Prices",
+                            color = TextPrimary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (isArabic) "اضغط على أي مجموعة لتوسيع أصنافها وخياراتها" else "Tap any group to expand variants",
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
+                    }
                     NeonBadge(
-                        text = if (isArabic) "${groupedProducts.size} منتج" else "${groupedProducts.size} Products",
+                        text = if (isArabic) "${productGroups.size} مجموعة" else "${productGroups.size} Groups",
                         accentColor = ElectricCyan
                     )
                 }
             }
 
-            // Products Listed Under Each Other (Name + Direct Price)
-            items(groupedProducts.entries.toList(), key = { it.key }) { entry ->
-                val prices = entry.value
-                val first = prices.first()
-                val minPrice = prices.minOfOrNull { it.priceDzd } ?: first.priceDzd
-
-                DirectProductPriceItem(
-                    barcode = entry.key,
-                    itemName = first.itemName,
-                    itemNameAr = first.itemNameAr,
-                    storeName = first.storeName,
-                    storeNameAr = first.storeNameAr,
-                    priceDzd = minPrice,
+            // Grouped Product Cards with Direct Add to Cart & Expandable Sub-variants
+            items(productGroups, key = { it.id }) { group ->
+                ProductGroupCard(
+                    group = group,
                     isArabic = isArabic,
-                    onEditPrice = { reportItemDialog = first },
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                    autoExpand = searchQuery.isNotBlank(),
+                    onQuickAddToCart = { variant ->
+                        viewModel.addItem(
+                            name = variant.itemName,
+                            nameAr = variant.itemNameAr,
+                            category = group.category,
+                            quantity = 1,
+                            unit = "pcs",
+                            barcode = variant.barcode,
+                            estimatedPriceDzd = variant.priceDzd
+                        )
+                    },
+                    onEditVariantPrice = { variant ->
+                        reportItemDialog = variant.allPrices.firstOrNull()
+                    },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                 )
             }
         }
@@ -1527,4 +1550,382 @@ private fun ReportPriceDialog(
             }
         }
     )
+}
+
+
+@Composable
+fun ProductGroupCard(
+    group: ProductGroup,
+    isArabic: Boolean,
+    autoExpand: Boolean,
+    onQuickAddToCart: (ProductVariant) -> Unit,
+    onEditVariantPrice: (ProductVariant) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+    var isExpanded by remember { mutableStateOf(false) }
+
+    val expandedState = if (autoExpand) true else isExpanded
+
+    var justAddedDefault by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
+
+    val cardBg = if (isLight) Color.White else Color(0xFF131D31)
+    val cardBorder = if (isLight) {
+        BorderStroke(1.2.dp, if (expandedState) CyanTintBorder else LightCardBorder)
+    } else {
+        BorderStroke(1.2.dp, if (expandedState) ElectricCyan.copy(alpha = 0.6f) else Color(0x28FFFFFF))
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(cardBg)
+            .border(cardBorder, RoundedCornerShape(16.dp))
+            .testTag("product_group_${group.id}")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp)
+        ) {
+            // Top Row: Category tag + Variants Count
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Category pill
+                val categoryLabel = LocalizationUtil.getCategoryLabel(group.category, isArabic)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isLight) Color(0xFFEBF5FF) else Color(0x1F00E5FF))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = categoryLabel,
+                        color = if (isLight) CyanTintText else ElectricCyan,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                // Variants count badge
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isLight) Color(0xFFF1F5F9) else Color(0x14FFFFFF))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = if (isArabic) "${group.variants.size} أصناف متوفرة" else "${group.variants.size} Variants",
+                        color = TextSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Normal
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Main Title & Price Range Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (isArabic) group.nameAr else group.nameEn,
+                        color = TextPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    val defaultName = if (isArabic) group.defaultVariant.itemNameAr else group.defaultVariant.itemName
+                    Text(
+                        text = if (isArabic) "النوع المقترح: $defaultName" else "Default: $defaultName",
+                        color = TextSecondary,
+                        fontSize = 11.5.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                // Price display
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = if (group.minPrice == group.maxPrice) {
+                            LocalizationUtil.formatDzd(group.minPrice, isArabic)
+                        } else {
+                            if (isArabic) "يبدأ من ${LocalizationUtil.formatDzd(group.minPrice, isArabic)}"
+                            else "From ${LocalizationUtil.formatDzd(group.minPrice, isArabic)}"
+                        },
+                        color = EmeraldSavings,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (group.minPrice != group.maxPrice) {
+                        Text(
+                            text = "${LocalizationUtil.formatDzd(group.minPrice, isArabic)} - ${LocalizationUtil.formatDzd(group.maxPrice, isArabic)}",
+                            color = TextSecondary,
+                            fontSize = 10.5.sp
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Action Row: Quick Add Button + Expand Accordion Toggle
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Direct Add to Cart (Quick Add)
+                val addBg = if (justAddedDefault) EmeraldSavings else if (isLight) Color(0xFF0088CC) else ElectricCyan
+                val addContentColor = if (justAddedDefault) Color.White else if (isLight) Color.White else Color(0xFF091220)
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(addBg)
+                        .clickable {
+                            try {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            } catch (_: Exception) {}
+                            onQuickAddToCart(group.defaultVariant)
+                            justAddedDefault = true
+                        }
+                        .padding(horizontal = 14.dp, vertical = 7.dp)
+                        .testTag("quick_add_group_${group.id}"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = if (justAddedDefault) Icons.Default.Check else Icons.Default.AddShoppingCart,
+                            contentDescription = "Add to Cart",
+                            tint = addContentColor,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (justAddedDefault) {
+                                if (isArabic) "تمت الإضافة ✓" else "Added ✓"
+                            } else {
+                                if (isArabic) "إضافة سريعة للسلة" else "Quick Add"
+                            },
+                            color = addContentColor,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // Expand / Collapse Details Toggle
+                val toggleBg = if (isLight) Color(0xFFF8FAFC) else Color(0x14FFFFFF)
+                val toggleBorder = if (isLight) BorderStroke(1.dp, LightCardBorder) else BorderStroke(1.dp, Color(0x1EFFFFFF))
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(toggleBg)
+                        .border(toggleBorder, RoundedCornerShape(10.dp))
+                        .clickable { isExpanded = !isExpanded }
+                        .padding(horizontal = 12.dp, vertical = 7.dp)
+                        .testTag("expand_group_${group.id}"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = if (expandedState) {
+                                if (isArabic) "إخفاء التفاصيل" else "Hide variants"
+                            } else {
+                                if (isArabic) "كل الأصناف (${group.variants.size})" else "All variants (${group.variants.size})"
+                            },
+                            color = if (isLight) CyanTintText else ElectricCyan,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = if (expandedState) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Toggle",
+                            tint = if (isLight) CyanTintText else ElectricCyan,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+
+            // Expandable Sub-variants Section
+            AnimatedVisibility(
+                visible = expandedState,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(if (isLight) LightCardBorder else Color(0x1AFFFFFF))
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = if (isArabic) "الأصناف الفرعية والخيارات المتوفرة:" else "Available Sub-Variants:",
+                        color = TextSecondary,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    group.variants.forEach { variant ->
+                        SubVariantItemRow(
+                            variant = variant,
+                            isArabic = isArabic,
+                            onAddToCart = { onQuickAddToCart(variant) },
+                            onEditPrice = { onEditVariantPrice(variant) }
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SubVariantItemRow(
+    variant: ProductVariant,
+    isArabic: Boolean,
+    onAddToCart: () -> Unit,
+    onEditPrice: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+    val rowBg = if (isLight) Color(0xFFF8FAFC) else Color(0xFF0F172A)
+    val rowBorder = if (isLight) BorderStroke(1.dp, Color(0xFFE2E8F0)) else BorderStroke(1.dp, Color(0x18FFFFFF))
+
+    var addedThis by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(rowBg)
+            .border(rowBorder, RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+            .testTag("variant_row_${variant.barcode}")
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (isArabic) variant.itemNameAr else variant.itemName,
+                    color = TextPrimary,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Storefront,
+                        contentDescription = "Store",
+                        tint = TextSecondary,
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(
+                        text = if (isArabic) variant.storeNameAr else variant.storeName,
+                        color = TextSecondary,
+                        fontSize = 10.5.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "•",
+                        color = TextMuted,
+                        fontSize = 10.sp
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = LocalizationUtil.formatDzd(variant.priceDzd, isArabic),
+                        color = EmeraldSavings,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Sub-variant Actions: Edit Price + Add to Cart
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Edit Price Button
+                IconButton(
+                    onClick = onEditPrice,
+                    modifier = Modifier.size(30.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit Price",
+                        tint = TextSecondary,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                // Individual Add Button
+                val btnColor = if (addedThis) EmeraldSavings else if (isLight) Color(0xFF0077B6) else ElectricCyan
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(btnColor.copy(alpha = 0.18f))
+                        .border(BorderStroke(1.dp, btnColor), RoundedCornerShape(8.dp))
+                        .clickable {
+                            onAddToCart()
+                            addedThis = true
+                        }
+                        .padding(horizontal = 9.dp, vertical = 5.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = if (addedThis) Icons.Default.Check else Icons.Default.Add,
+                            contentDescription = "Add",
+                            tint = btnColor,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = if (addedThis) (if (isArabic) "تم ✓" else "Added") else (if (isArabic) "أضف" else "Add"),
+                            color = btnColor,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
