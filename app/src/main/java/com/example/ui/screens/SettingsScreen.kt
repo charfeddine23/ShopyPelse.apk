@@ -7,6 +7,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +42,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,10 +51,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -91,6 +95,7 @@ fun SettingsScreen(
     val lastBackupDate by viewModel.lastBackupDate.collectAsStateWithLifecycle()
 
     var showQrDialog by remember { mutableStateOf(false) }
+    var qrDialogInitialMode by remember { mutableStateOf(false) }
 
     // Storage Access Framework Launcher to save backup file to Google Drive or local device
     val createDocLauncher = rememberLauncherForActivityResult(
@@ -285,13 +290,16 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(EmeraldSavings.copy(alpha = 0.2f))
-                                        .border(BorderStroke(1.dp, EmeraldSavings), RoundedCornerShape(10.dp)),
+                                        .size(42.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(EmeraldSavings.copy(alpha = 0.16f))
+                                        .border(BorderStroke(1.dp, EmeraldSavings.copy(alpha = 0.6f)), RoundedCornerShape(12.dp)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
@@ -301,12 +309,12 @@ fun SettingsScreen(
                                         modifier = Modifier.size(24.dp)
                                     )
                                 }
-                                Spacer(modifier = Modifier.width(10.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text(
-                                        text = if (isArabic) "المزامنة المباشرة بالـ QR" else "Direct QR Transfer",
+                                        text = if (isArabic) "المزامنة المباشرة بـ QR Code" else "Direct QR Sync",
                                         color = TextPrimary,
-                                        fontSize = 15.sp,
+                                        fontSize = 15.5.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
@@ -332,32 +340,147 @@ fun SettingsScreen(
                                 "Display a QR code to transfer your shopping list to another device, or import a shared list by pasting/scanning."
                             },
                             color = TextSecondary,
-                            fontSize = 12.sp,
-                            lineHeight = 17.sp
+                            fontSize = 12.5.sp,
+                            lineHeight = 18.sp
                         )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Highlights Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(EmeraldSavings.copy(alpha = 0.12f))
+                                    .border(BorderStroke(1.dp, EmeraldSavings.copy(alpha = 0.3f)), RoundedCornerShape(8.dp))
+                                    .padding(vertical = 5.dp, horizontal = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (isArabic) "⚡ نقل فوري بدون شبكة" else "⚡ Instant Offline",
+                                    color = EmeraldSavings,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(ElectricCyan.copy(alpha = 0.12f))
+                                    .border(BorderStroke(1.dp, ElectricCyan.copy(alpha = 0.3f)), RoundedCornerShape(8.dp))
+                                    .padding(vertical = 5.dp, horizontal = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (isArabic) "🔒 مشفر ومحلي 100%" else "🔒 100% Encrypted",
+                                    color = ElectricCyan,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
 
                         Spacer(modifier = Modifier.height(14.dp))
 
-                        // Action Buttons: Share QR / Import QR
+                        // Harmonized Action Buttons: Share QR / Import QR
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            GlowingActionButton(
-                                text = if (isArabic) "مشاركة القائمة بالـ QR" else "Share via QR",
-                                icon = Icons.Default.Share,
-                                color = EmeraldSavings,
-                                onClick = { showQrDialog = true },
-                                modifier = Modifier.weight(1f)
-                            )
+                            // Button 1: Share
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            listOf(EmeraldSavings, EmeraldSavings.copy(alpha = 0.85f))
+                                        )
+                                    )
+                                    .border(BorderStroke(1.dp, EmeraldSavings), RoundedCornerShape(12.dp))
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = ripple(bounded = true, color = Color.White),
+                                        onClick = {
+                                            qrDialogInitialMode = false
+                                            showQrDialog = true
+                                        }
+                                    )
+                                    .padding(horizontal = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.QrCode,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(17.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isArabic) "مشاركة القائمة" else "Share via QR",
+                                        color = Color.White,
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
 
-                            GlowingActionButton(
-                                text = if (isArabic) "استيراد قائمة" else "Import List",
-                                icon = Icons.Default.Download,
-                                color = ElectricCyan,
-                                onClick = { showQrDialog = true },
-                                modifier = Modifier.weight(1f)
-                            )
+                            // Button 2: Import
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            listOf(ElectricCyan, ElectricCyan.copy(alpha = 0.85f))
+                                        )
+                                    )
+                                    .border(BorderStroke(1.dp, ElectricCyan), RoundedCornerShape(12.dp))
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = ripple(bounded = true, color = Color.White),
+                                        onClick = {
+                                            qrDialogInitialMode = true
+                                            showQrDialog = true
+                                        }
+                                    )
+                                    .padding(horizontal = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Download,
+                                        contentDescription = null,
+                                        tint = Color(0xFF06141D),
+                                        modifier = Modifier.size(17.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isArabic) "استيراد قائمة" else "Import List",
+                                        color = Color(0xFF06141D),
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -512,33 +635,6 @@ fun SettingsScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // Quick Sync Simulator
-                        val isLight = MaterialTheme.colorScheme.background == BackgroundLight
-                        val syncBg = if (isLight) CyanTintBg else Color(0x18FFFFFF)
-                        val syncBorder = if (isLight) BorderStroke(1.dp, CyanTintBorder) else BorderStroke(1.dp, Color(0x20FFFFFF))
-                        val syncText = if (isLight) CyanTintText else ElectricCyan
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(syncBg)
-                                .border(syncBorder, RoundedCornerShape(10.dp))
-                                .clickable {
-                                    viewModel.markGoogleDriveBackupDone()
-                                }
-                                .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = if (isArabic) "⚡ مزامنة وتحديث حالة Drive الآن" else "⚡ Refresh Cloud Status Now",
-                                color = syncText,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
                     }
                 }
             }
@@ -656,6 +752,7 @@ fun SettingsScreen(
             QrShareDialog(
                 payload = viewModel.getQrSharePayload(),
                 isArabic = isArabic,
+                initialImportMode = qrDialogInitialMode,
                 onDismiss = { showQrDialog = false },
                 onImportPayload = { payload ->
                     viewModel.importListFromQr(payload)

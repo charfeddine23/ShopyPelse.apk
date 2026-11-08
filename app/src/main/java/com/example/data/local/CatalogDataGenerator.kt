@@ -623,32 +623,49 @@ object CatalogDataGenerator {
     )
 
     /**
-     * Generates a deterministic list of 3,000 distinct Algerian grocery items with barcodes and realistic DZD prices.
+     * Generates a deterministic list of 5,000 distinct Algerian grocery items with barcodes and realistic retail consumer DZD prices.
+     * All items are individual consumer packages (retail pricing for end consumers, NOT wholesale cartons/pallets).
      */
-    fun generate3000Products(): List<ShoppingItem> {
+    fun generate5000Products(): List<ShoppingItem> {
         val result = mutableListOf<ShoppingItem>()
         var currentId = 1L
         var templateIdx = 0
 
-        // Iterate until we reach 3,000 products
-        while (result.size < 3000) {
+        // Sub-variant descriptors to guarantee distinct, realistic supermarket choices without duplicate names
+        val editions = listOf(
+            Pair("Classic", "الأصيل الكلاسيكي"),
+            Pair("Premium", "الفاخر الممتاز"),
+            Pair("Special Selection", "تشكيلة مختارة"),
+            Pair("Gold Label", "العلامة الذهبية"),
+            Pair("Family Pack", "حجم عائلي توفيري"),
+            Pair("Traditional Taste", "الذوق التقليدي الجزائري"),
+            Pair("Extra Pure", "نقي ومصفى إضافي"),
+            Pair("Eco Value", "اقتصادي ومضمون"),
+            Pair("Gourmet", "ذوق رفيع فاخر"),
+            Pair("Natural Bio", "طبيعي 100%")
+        )
+
+        // Iterate until we reach exactly 5,000 unique products
+        while (result.size < 5000) {
             val template = templates[templateIdx % templates.size]
-            val round = (templateIdx / templates.size) + 1
+            val round = (templateIdx / templates.size)
+            val edition = editions[round % editions.size]
+
             for (brand in template.brands) {
                 for (unit in template.units) {
-                    if (result.size >= 3000) break
+                    if (result.size >= 5000) break
 
                     val barcodeNum = 6130000000000L + currentId
                     val barcode = barcodeNum.toString()
 
-                    val qualifierEn = if (round > 1) " Select #$round" else ""
-                    val qualifierAr = if (round > 1) " صنف #$round" else ""
+                    val editionSuffixEn = if (round > 0) " - ${edition.first}" else ""
+                    val editionSuffixAr = if (round > 0) " - ${edition.second}" else ""
 
-                    val nameEn = "${brand.first} ${template.baseEn}$qualifierEn ($unit)"
-                    val nameAr = "${template.baseAr} ${brand.second}$qualifierAr ($unit)"
+                    val nameEn = "${brand.first} ${template.baseEn}$editionSuffixEn ($unit)"
+                    val nameAr = "${template.baseAr} ${brand.second}$editionSuffixAr ($unit)"
 
-                    // Slight price variation based on brand and unit index
-                    val priceMultiplier = 1.0 + ((currentId % 11) * 0.04) - 0.18
+                    // Consumer retail price variations (realistic consumer retail supermarket price in DZD)
+                    val priceMultiplier = 1.0 + ((currentId % 9) * 0.03) - 0.12
                     val finalPrice = (template.defaultPriceDzd * priceMultiplier).toInt().coerceAtLeast(15)
 
                     result.add(
@@ -662,18 +679,23 @@ object CatalogDataGenerator {
                             isChecked = false,
                             barcode = barcode,
                             estimatedPriceDzd = finalPrice.toDouble(),
-                            isFrequent = (currentId % 25 == 0L)
+                            isFrequent = (currentId % 20 == 0L)
                         )
                     )
                     currentId++
                 }
-                if (result.size >= 3000) break
+                if (result.size >= 5000) break
             }
             templateIdx++
         }
 
         return result
     }
+
+    /**
+     * Backward-compatible alias for 3000 products.
+     */
+    fun generate3000Products(): List<ShoppingItem> = generate5000Products().take(3000)
 
     /**
      * Generates market prices for each product in Algerian supermarkets.

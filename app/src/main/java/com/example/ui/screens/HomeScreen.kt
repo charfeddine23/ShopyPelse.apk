@@ -698,15 +698,26 @@ fun ShoppingItemRow(
             // Item Name & Category Details
             Column(modifier = Modifier.weight(1f)) {
                 val rawTitle = if (isArabic) item.nameAr else item.name
-                val displayTitle = if (rawTitle.contains("(") && rawTitle.contains(")")) {
-                    val main = rawTitle.substringBefore("(").trim()
-                    val details = rawTitle.substringAfter("(").substringBefore(")").trim()
-                    "$main - $details"
-                } else if (!rawTitle.contains(" - ")) {
-                    val catLabel = LocalizationUtil.getCategoryLabel(item.category, isArabic)
-                    "$rawTitle - $catLabel"
+                val cleanedTitle = rawTitle
+                    .replace("(مجموعة)", "")
+                    .replace("- مجموعة", "")
+                    .replace(" - مجموعة", "")
+                    .trim()
+                val isGroupItem = item.barcode?.startsWith("GRP-") == true ||
+                        item.unit.equals("مجموعة", ignoreCase = true) ||
+                        item.unit.equals("group", ignoreCase = true)
+                val displayTitle = if (isGroupItem) {
+                    cleanedTitle
+                } else if (cleanedTitle.contains("(") && cleanedTitle.contains(")")) {
+                    val main = cleanedTitle.substringBefore("(").trim()
+                    val details = cleanedTitle.substringAfter("(").substringBefore(")").trim()
+                    if (details.equals("مجموعة", ignoreCase = true) || details.equals("group", ignoreCase = true)) {
+                        main
+                    } else {
+                        "$main - $details"
+                    }
                 } else {
-                    rawTitle
+                    cleanedTitle
                 }
 
                 Text(
@@ -1127,6 +1138,18 @@ fun AddItemSheetContent(
             AddItemGroupCard(
                 group = group,
                 isArabic = isArabic,
+                onAddGroup = { grp ->
+                    val finalCat = grp.category.ifBlank { onAutoCategorize(grp.nameEn, grp.nameAr) }
+                    onAddItem(
+                        grp.nameEn,
+                        grp.nameAr,
+                        finalCat,
+                        1,
+                        if (isArabic) "مجموعة" else "group",
+                        "GRP-${grp.id}",
+                        grp.avgPrice
+                    )
+                },
                 onAddVariant = { variant ->
                     val finalCat = group.category.ifBlank { onAutoCategorize(variant.itemName, variant.itemNameAr) }
                     onAddItem(
@@ -1341,11 +1364,13 @@ fun AddItemSheetContent(
 private fun AddItemGroupCard(
     group: ProductGroup,
     isArabic: Boolean,
+    onAddGroup: (ProductGroup) -> Unit,
     onAddVariant: (ProductVariant) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val isLight = MaterialTheme.colorScheme.background == BackgroundLight
     var isExpanded by remember { mutableStateOf(false) }
+    var groupAdded by remember { mutableStateOf(false) }
     var justAddedId by remember { mutableStateOf<String?>(null) }
     val haptic = LocalHapticFeedback.current
 
@@ -1402,7 +1427,7 @@ private fun AddItemGroupCard(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            // Main Info: Group Name & Price Range
+            // Main Info: Group Name & Average Price
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1417,11 +1442,11 @@ private fun AddItemGroupCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    val defaultName = if (isArabic) group.defaultVariant.itemNameAr else group.defaultVariant.itemName
                     Text(
-                        text = if (isArabic) "المقترح: $defaultName" else "Default: $defaultName",
-                        color = TextSecondary,
-                        fontSize = 11.sp,
+                        text = if (isArabic) "متوسط المجموعة: ${LocalizationUtil.formatDzd(group.avgPrice, true)}" else "Group Average: ${LocalizationUtil.formatDzd(group.avgPrice, false)}",
+                        color = if (isLight) MintTintText else EmeraldSavings,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -1429,17 +1454,12 @@ private fun AddItemGroupCard(
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                // Price display
+                // Price display (Average price + range)
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = if (group.minPrice == group.maxPrice) {
-                            LocalizationUtil.formatDzd(group.minPrice, isArabic)
-                        } else {
-                            if (isArabic) "يبدأ من ${LocalizationUtil.formatDzd(group.minPrice, isArabic)}"
-                            else "From ${LocalizationUtil.formatDzd(group.minPrice, isArabic)}"
-                        },
+                        text = LocalizationUtil.formatDzd(group.avgPrice, isArabic),
                         color = EmeraldSavings,
-                        fontSize = 13.5.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
                     if (group.minPrice != group.maxPrice) {
@@ -1454,16 +1474,15 @@ private fun AddItemGroupCard(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Action Row: Quick Add Button + Expand Accordion Toggle
+            // Action Row: Quick Add Group Button + Expand Accordion Toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Quick Add Default Variant Button
-                val isAdded = (justAddedId == group.defaultVariant.barcode)
-                val addBg = if (isAdded) EmeraldSavings else if (isLight) Color(0xFF0284C7) else ElectricCyan
-                val addContentColor = if (isAdded) Color.White else if (isLight) Color.White else Color(0xFF051323)
+                // Quick Add Group Button (Adds group itself with average price)
+                val addBg = if (groupAdded) EmeraldSavings else if (isLight) Color(0xFF0284C7) else ElectricCyan
+                val addContentColor = if (groupAdded) Color.White else if (isLight) Color.White else Color(0xFF051323)
 
                 Box(
                     modifier = Modifier
@@ -1471,8 +1490,8 @@ private fun AddItemGroupCard(
                         .background(addBg)
                         .clickable {
                             try { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) } catch (_: Exception) {}
-                            onAddVariant(group.defaultVariant)
-                            justAddedId = group.defaultVariant.barcode
+                            onAddGroup(group)
+                            groupAdded = true
                         }
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                         .testTag("quick_add_sheet_group_${group.id}"),
@@ -1480,17 +1499,17 @@ private fun AddItemGroupCard(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector = if (isAdded) Icons.Default.Check else Icons.Default.Add,
+                            imageVector = if (groupAdded) Icons.Default.Check else Icons.Default.Add,
                             contentDescription = null,
                             tint = addContentColor,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (isAdded) {
-                                if (isArabic) "تمت الإضافة!" else "Added!"
+                            text = if (groupAdded) {
+                                if (isArabic) "أُضيفت المجموعة!" else "Group Added!"
                             } else {
-                                if (isArabic) "إضافة للسلة" else "Add to Cart"
+                                if (isArabic) "إضافة المجموعة (${group.avgPrice.toInt()} د.ج)" else "Add Group (${group.avgPrice.toInt()} DZD)"
                             },
                             color = addContentColor,
                             fontSize = 11.5.sp,

@@ -34,6 +34,9 @@ interface MarketPriceDao {
     @Query("UPDATE market_prices SET priceDzd = :newPrice, verifiedCount = verifiedCount + 1, updatedAt = :updatedAt WHERE barcode = :barcode AND storeName = :storeName")
     suspend fun updatePriceReport(barcode: String, storeName: String, newPrice: Double, updatedAt: Long = System.currentTimeMillis())
 
+    @Query("UPDATE market_prices SET priceDzd = :newPrice, updatedAt = :updatedAt WHERE barcode = :barcode")
+    suspend fun updatePriceForBarcode(barcode: String, newPrice: Double, updatedAt: Long = System.currentTimeMillis())
+
     @Query("SELECT * FROM price_history WHERE barcode = :barcode ORDER BY id ASC")
     fun getPriceHistory(barcode: String): Flow<List<PriceHistory>>
 

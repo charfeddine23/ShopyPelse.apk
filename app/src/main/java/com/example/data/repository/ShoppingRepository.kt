@@ -72,10 +72,45 @@ class ShoppingRepository(
 
     suspend fun ensureCatalogPopulated() {
         val currentPrices = marketPriceDao.getAllMarketPrices().first()
-        if (currentPrices.size < 2500) {
-            val catalog3000 = com.example.data.local.CatalogDataGenerator.generate3000Products()
-            val marketPrices3000 = com.example.data.local.CatalogDataGenerator.generateMarketPricesForCatalog(catalog3000)
-            marketPriceDao.insertMarketPrices(marketPrices3000)
+        if (currentPrices.size < 4900) {
+            val catalog5000 = com.example.data.local.CatalogDataGenerator.generate5000Products()
+            val marketPrices5000 = com.example.data.local.CatalogDataGenerator.generateMarketPricesForCatalog(catalog5000)
+            marketPriceDao.insertMarketPrices(marketPrices5000)
+        }
+    }
+
+    suspend fun addNewProductPrice(
+        name: String,
+        nameAr: String,
+        storeName: String,
+        storeNameAr: String,
+        priceDzd: Double,
+        barcode: String? = null
+    ): String {
+        val finalBarcode = if (!barcode.isNullOrBlank()) barcode else (6130000000000L + (System.currentTimeMillis() % 1000000000L)).toString()
+        val marketPrice = MarketPrice(
+            barcode = finalBarcode,
+            itemName = name,
+            itemNameAr = nameAr,
+            storeName = storeName,
+            storeNameAr = storeNameAr,
+            priceDzd = priceDzd,
+            verifiedCount = 1
+        )
+        marketPriceDao.insertMarketPrice(marketPrice)
+        return finalBarcode
+    }
+
+    suspend fun updateProductPrice(barcode: String, storeName: String?, newPrice: Double) {
+        if (storeName.isNullOrBlank()) {
+            marketPriceDao.updatePriceForBarcode(barcode, newPrice)
+        } else {
+            val existing = marketPriceDao.getPriceForBarcodeAndStore(barcode, storeName)
+            if (existing != null) {
+                marketPriceDao.updatePriceReport(barcode, storeName, newPrice)
+            } else {
+                marketPriceDao.updatePriceForBarcode(barcode, newPrice)
+            }
         }
     }
 

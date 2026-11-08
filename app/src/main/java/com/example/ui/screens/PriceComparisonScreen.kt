@@ -20,6 +20,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +42,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
@@ -154,6 +158,7 @@ fun PriceComparisonScreen(
     val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
 
     var reportItemDialog by remember { mutableStateOf<MarketPrice?>(null) }
+    var showAddProductOrGroupDialog by remember { mutableStateOf(false) }
 
     val productGroups = remember(allPrices, searchQuery, selectedCategory) {
         val groups = ProductGroupingUtil.groupMarketPrices(allPrices)
@@ -338,42 +343,79 @@ fun PriceComparisonScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val isLight = MaterialTheme.colorScheme.background == BackgroundLight
                     val backBtnBg = if (isLight) Color.White else Color(0x33FFFFFF)
                     val backBtnBorder = if (isLight) BorderStroke(1.dp, LightCardBorder) else BorderStroke(1.dp, Color(0x20FFFFFF))
 
-                    IconButton(
-                        onClick = onBack,
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(backBtnBg)
-                            .border(backBtnBorder, CircleShape)
-                            .size(40.dp)
-                            .testTag("price_comparison_back")
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = if (isLight) CyanTintText else TextPrimary
-                        )
+                        IconButton(
+                            onClick = onBack,
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(backBtnBg)
+                                .border(backBtnBorder, CircleShape)
+                                .size(40.dp)
+                                .testTag("price_comparison_back")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = if (isLight) CyanTintText else TextPrimary
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        Column {
+                            Text(
+                                text = if (isArabic) "المنتجات" else "Products",
+                                color = TextPrimary,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = if (isArabic) "قائمة المنتجات وأسعار التجزئة للزبون" else "Consumer Retail Supermarket Prices",
+                                color = TextSecondary,
+                                fontSize = 11.5.sp
+                            )
+                        }
                     }
 
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    Column {
-                        Text(
-                            text = if (isArabic) "المنتجات" else "Products",
-                            color = TextPrimary,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = if (isArabic) "قائمة المنتجات والأسعار المباشرة في الجزائر" else "Algerian Products & Direct Supermarket Prices",
-                            color = TextSecondary,
-                            fontSize = 12.sp
-                        )
+                    // Prominent Add Product / Group Button
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isLight) CyanTintBg else ElectricCyan.copy(alpha = 0.18f))
+                            .border(
+                                BorderStroke(1.2.dp, if (isLight) CyanTintBorder else ElectricCyan.copy(alpha = 0.55f)),
+                                RoundedCornerShape(12.dp)
+                            )
+                            .clickable { showAddProductOrGroupDialog = true }
+                            .padding(horizontal = 10.dp, vertical = 7.dp)
+                            .testTag("btn_add_product_or_group"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null,
+                                tint = if (isLight) CyanTintText else ElectricCyan,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isArabic) "إضافة منتج/مجموعة" else "Add Item/Group",
+                                color = if (isLight) CyanTintText else ElectricCyan,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
@@ -501,13 +543,24 @@ fun PriceComparisonScreen(
                 }
             }
 
-            // Grouped Product Cards with Direct Add to Cart & Expandable Sub-variants
+            // Grouped Product Cards with Direct Add Group to Cart & Expandable Sub-variants
             items(productGroups, key = { it.id }) { group ->
                 ProductGroupCard(
                     group = group,
                     isArabic = isArabic,
                     autoExpand = searchQuery.isNotBlank(),
-                    onQuickAddToCart = { variant ->
+                    onAddGroupToCart = { grp ->
+                        viewModel.addItem(
+                            name = grp.nameEn,
+                            nameAr = grp.nameAr,
+                            category = grp.category,
+                            quantity = 1,
+                            unit = if (isArabic) "مجموعة" else "group",
+                            barcode = "GRP-${grp.id}",
+                            estimatedPriceDzd = grp.avgPrice
+                        )
+                    },
+                    onAddVariantToCart = { variant ->
                         viewModel.addItem(
                             name = variant.itemName,
                             nameAr = variant.itemNameAr,
@@ -519,7 +572,15 @@ fun PriceComparisonScreen(
                         )
                     },
                     onEditVariantPrice = { variant ->
-                        reportItemDialog = variant.allPrices.firstOrNull()
+                        reportItemDialog = variant.allPrices.firstOrNull() ?: MarketPrice(
+                            barcode = variant.barcode,
+                            itemName = variant.itemName,
+                            itemNameAr = variant.itemNameAr,
+                            storeName = variant.storeName,
+                            storeNameAr = variant.storeNameAr,
+                            priceDzd = variant.priceDzd,
+                            verifiedCount = 1
+                        )
                     },
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                 )
@@ -527,7 +588,7 @@ fun PriceComparisonScreen(
         }
     }
 
-    // Crowdsourced Price Update Dialog
+    // Direct Retail Price Update Dialog
     if (reportItemDialog != null) {
         val itemToReport = reportItemDialog!!
         ReportPriceDialog(
@@ -535,14 +596,31 @@ fun PriceComparisonScreen(
             isArabic = isArabic,
             onDismiss = { reportItemDialog = null },
             onSubmit = { storeName, storeNameAr, newPrice ->
-                viewModel.reportPrice(
+                viewModel.updatePrice(
                     barcode = itemToReport.barcode,
                     storeName = storeName,
-                    storeNameAr = storeNameAr,
-                    itemName = itemToReport.itemName,
-                    priceDzd = newPrice
+                    newPrice = newPrice
                 )
                 reportItemDialog = null
+            }
+        )
+    }
+
+    // Add New Product or Group Dialog
+    if (showAddProductOrGroupDialog) {
+        AddProductOrGroupDialog(
+            isArabic = isArabic,
+            onDismiss = { showAddProductOrGroupDialog = false },
+            onSubmit = { isGroup, name, nameAr, category, storeName, storeNameAr, priceDzd, barcode ->
+                viewModel.addNewProductOrGroup(
+                    name = name,
+                    nameAr = nameAr,
+                    storeName = storeName,
+                    storeNameAr = storeNameAr,
+                    priceDzd = priceDzd,
+                    barcode = barcode
+                )
+                showAddProductOrGroupDialog = false
             }
         )
     }
@@ -1489,7 +1567,7 @@ private fun ReportPriceDialog(
         containerColor = if (isLight) Color.White else Color(0xFF131C2E),
         title = {
             Text(
-                text = if (isArabic) "تحديث سعر المنتج" else "Update Store Price",
+                text = if (isArabic) "تعديل سعر المنتج بالتجزئة" else "Edit Consumer Retail Price",
                 color = TextPrimary,
                 fontWeight = FontWeight.Bold
             )
@@ -1503,7 +1581,7 @@ private fun ReportPriceDialog(
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = if (isArabic) priceItem.storeNameAr else priceItem.storeName,
+                    text = if (isArabic) "المتجر: ${priceItem.storeNameAr}" else "Store: ${priceItem.storeName}",
                     color = EmeraldSavings,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
@@ -1512,7 +1590,7 @@ private fun ReportPriceDialog(
                 OutlinedTextField(
                     value = priceText,
                     onValueChange = { priceText = it },
-                    label = { Text(if (isArabic) "السعر الجديد (د.ج)" else "New Price (DZD)") },
+                    label = { Text(if (isArabic) "سعر التجزئة الجديد للزبون (د.ج)" else "New Consumer Price (DZD)") },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = ElectricCyan,
@@ -1524,9 +1602,9 @@ private fun ReportPriceDialog(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = if (isArabic) {
-                        "سيتم تحديث السعر في قاعدة البيانات المحلية لإفادة قائمتك ومقارنة الأسعار."
+                        "سيتم حفظ السعر مباشرة في قاعدة البيانات وحساب متوسط المجموعة والسلة بدقة."
                     } else {
-                        "This updates the local database price for your shopping calculations."
+                        "Updates database and recalculates group averages and shopping basket."
                     },
                     color = TextSecondary,
                     fontSize = 11.sp
@@ -1535,7 +1613,7 @@ private fun ReportPriceDialog(
         },
         confirmButton = {
             GlowingActionButton(
-                text = if (isArabic) "تأكيد التحديث" else "Submit",
+                text = if (isArabic) "تثبيت وتحديث السعر" else "Update Price",
                 icon = Icons.Default.Check,
                 onClick = {
                     val p = priceText.toDoubleOrNull() ?: priceItem.priceDzd
@@ -1552,13 +1630,261 @@ private fun ReportPriceDialog(
     )
 }
 
+@Composable
+private fun AddProductOrGroupDialog(
+    isArabic: Boolean,
+    onDismiss: () -> Unit,
+    onSubmit: (
+        isGroup: Boolean,
+        name: String,
+        nameAr: String,
+        category: String,
+        storeName: String,
+        storeNameAr: String,
+        priceDzd: Double,
+        barcode: String?
+    ) -> Unit
+) {
+    var isGroupMode by remember { mutableStateOf(false) }
+    var nameAr by remember { mutableStateOf("") }
+    var nameEn by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf("Dairy") }
+    var priceText by remember { mutableStateOf("") }
+    var customBarcode by remember { mutableStateOf("") }
+
+    val stores = listOf(
+        Pair("Uno Hypermarket", "هايبرماركت أونو"),
+        Pair("Ardis Alger", "أرديس الجزائر"),
+        Pair("Carrefour Alger", "كارفور الجزائر"),
+        Pair("Superette El Baraka", "سوبرماركت البركة"),
+        Pair("Superette En-Nour", "سوبرماركت النور")
+    )
+    var selectedStoreIndex by remember { mutableStateOf(0) }
+
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = if (isLight) Color.White else Color(0xFF131D31),
+        title = {
+            Column {
+                Text(
+                    text = if (isArabic) "إضافة جديدة إلى قائمة المنتجات" else "Add New Item / Group",
+                    color = TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                // Mode Toggle Tabs
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (isLight) Color(0xFFF1F5F9) else Color(0x22FFFFFF))
+                        .padding(3.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (!isGroupMode) (if (isLight) Color.White else ElectricCyan.copy(alpha = 0.25f)) else Color.Transparent)
+                            .clickable { isGroupMode = false }
+                            .padding(vertical = 7.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (isArabic) "منتج فردي" else "Product",
+                            color = if (!isGroupMode) (if (isLight) CyanTintText else ElectricCyan) else TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = if (!isGroupMode) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isGroupMode) (if (isLight) Color.White else ElectricCyan.copy(alpha = 0.25f)) else Color.Transparent)
+                            .clickable { isGroupMode = true }
+                            .padding(vertical = 7.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (isArabic) "مجموعة جديدة" else "New Group",
+                            color = if (isGroupMode) (if (isLight) CyanTintText else ElectricCyan) else TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = if (isGroupMode) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Name in Arabic
+                OutlinedTextField(
+                    value = nameAr,
+                    onValueChange = { nameAr = it },
+                    label = {
+                        Text(
+                            if (isGroupMode) {
+                                if (isArabic) "اسم المجموعة بالعربية (مثال: توابل وصلصات)" else "Group Name (Arabic)"
+                            } else {
+                                if (isArabic) "اسم المنتج بالعربية (مثال: عصير رامي 1L)" else "Product Name (Arabic)"
+                            }
+                        )
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = ElectricCyan,
+                        unfocusedBorderColor = GlassBorder,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    )
+                )
+
+                // Name in English / French
+                OutlinedTextField(
+                    value = nameEn,
+                    onValueChange = { nameEn = it },
+                    label = {
+                        Text(
+                            if (isGroupMode) {
+                                if (isArabic) "اسم المجموعة باللاتينية (اختياري)" else "Group Name (Latin)"
+                            } else {
+                                if (isArabic) "اسم المنتج باللاتينية (اختياري)" else "Product Name (Latin)"
+                            }
+                        )
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = ElectricCyan,
+                        unfocusedBorderColor = GlassBorder,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    )
+                )
+
+                // Retail Price Input (Consumer retail price)
+                OutlinedTextField(
+                    value = priceText,
+                    onValueChange = { priceText = it },
+                    label = { Text(if (isArabic) "سعر التجزئة للمستهلك (د.ج)" else "Consumer Retail Price (DZD)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = EmeraldSavings,
+                        unfocusedBorderColor = GlassBorder,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    )
+                )
+
+                // Category Selector
+                Text(
+                    text = if (isArabic) "اختر الصنف / القسم:" else "Category:",
+                    color = TextSecondary,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                val categories = listOf("Dairy", "Beverages", "Pantry", "Bakery", "Butchery", "Produce", "Cleaning", "SweetsNuts")
+                androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(categories.size) { idx ->
+                        val cat = categories[idx]
+                        val isCatSel = selectedCategory == cat
+                        val catLabel = LocalizationUtil.getCategoryLabel(cat, isArabic)
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isCatSel) (if (isLight) CyanTintBg else ElectricCyan.copy(alpha = 0.25f)) else (if (isLight) Color(0xFFF1F5F9) else Color(0x18FFFFFF)))
+                                .border(BorderStroke(1.dp, if (isCatSel) (if (isLight) CyanTintBorder else ElectricCyan) else Color.Transparent), RoundedCornerShape(8.dp))
+                                .clickable { selectedCategory = cat }
+                                .padding(horizontal = 9.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                text = catLabel,
+                                color = if (isCatSel) (if (isLight) CyanTintText else ElectricCyan) else TextSecondary,
+                                fontSize = 11.sp,
+                                fontWeight = if (isCatSel) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+
+                // Supermarket / Store Selector
+                Text(
+                    text = if (isArabic) "المتجر / السوبرماركت المرجعي:" else "Store / Supermarket:",
+                    color = TextSecondary,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(stores.size) { idx ->
+                        val store = stores[idx]
+                        val isStoreSel = selectedStoreIndex == idx
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isStoreSel) (if (isLight) MintTintBg else EmeraldSavings.copy(alpha = 0.25f)) else (if (isLight) Color(0xFFF1F5F9) else Color(0x18FFFFFF)))
+                                .border(BorderStroke(1.dp, if (isStoreSel) (if (isLight) MintTintBorder else EmeraldSavings) else Color.Transparent), RoundedCornerShape(8.dp))
+                                .clickable { selectedStoreIndex = idx }
+                                .padding(horizontal = 9.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                text = if (isArabic) store.second else store.first,
+                                color = if (isStoreSel) (if (isLight) MintTintText else EmeraldSavings) else TextSecondary,
+                                fontSize = 11.sp,
+                                fontWeight = if (isStoreSel) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            GlowingActionButton(
+                text = if (isArabic) "حفظ وإضافة" else "Save & Add",
+                icon = Icons.Default.Check,
+                enabled = nameAr.isNotBlank() && (priceText.toDoubleOrNull() ?: 0.0) > 0,
+                onClick = {
+                    val p = priceText.toDoubleOrNull() ?: 50.0
+                    val finalNameEn = nameEn.ifBlank { nameAr }
+                    val store = stores[selectedStoreIndex]
+                    onSubmit(
+                        isGroupMode,
+                        finalNameEn,
+                        nameAr,
+                        selectedCategory,
+                        store.first,
+                        store.second,
+                        p,
+                        customBarcode.ifBlank { null }
+                    )
+                },
+                color = EmeraldSavings
+            )
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(if (isArabic) "إلغاء" else "Cancel", color = TextSecondary)
+            }
+        }
+    )
+}
 
 @Composable
 fun ProductGroupCard(
     group: ProductGroup,
     isArabic: Boolean,
     autoExpand: Boolean,
-    onQuickAddToCart: (ProductVariant) -> Unit,
+    onAddGroupToCart: (ProductGroup) -> Unit,
+    onAddVariantToCart: (ProductVariant) -> Unit,
     onEditVariantPrice: (ProductVariant) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1567,7 +1893,7 @@ fun ProductGroupCard(
 
     val expandedState = if (autoExpand) true else isExpanded
 
-    var justAddedDefault by remember { mutableStateOf(false) }
+    var justAddedGroup by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
     val cardBg = if (isLight) Color.White else Color(0xFF131D31)
@@ -1630,7 +1956,7 @@ fun ProductGroupCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Main Title & Price Range Row
+            // Main Title & Average Price Indicator Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1646,11 +1972,11 @@ fun ProductGroupCard(
                         overflow = TextOverflow.Ellipsis
                     )
                     Spacer(modifier = Modifier.height(2.dp))
-                    val defaultName = if (isArabic) group.defaultVariant.itemNameAr else group.defaultVariant.itemName
                     Text(
-                        text = if (isArabic) "النوع المقترح: $defaultName" else "Default: $defaultName",
-                        color = TextSecondary,
-                        fontSize = 11.5.sp,
+                        text = if (isArabic) "متوسط المجموعة: ${LocalizationUtil.formatDzd(group.avgPrice, true)}" else "Group Average: ${LocalizationUtil.formatDzd(group.avgPrice, false)}",
+                        color = if (isLight) MintTintText else EmeraldSavings,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -1658,17 +1984,12 @@ fun ProductGroupCard(
 
                 Spacer(modifier = Modifier.width(10.dp))
 
-                // Price display
+                // Price display (Average + Min-Max Range)
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = if (group.minPrice == group.maxPrice) {
-                            LocalizationUtil.formatDzd(group.minPrice, isArabic)
-                        } else {
-                            if (isArabic) "يبدأ من ${LocalizationUtil.formatDzd(group.minPrice, isArabic)}"
-                            else "From ${LocalizationUtil.formatDzd(group.minPrice, isArabic)}"
-                        },
+                        text = LocalizationUtil.formatDzd(group.avgPrice, isArabic),
                         color = EmeraldSavings,
-                        fontSize = 14.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
                     )
                     if (group.minPrice != group.maxPrice) {
@@ -1683,15 +2004,15 @@ fun ProductGroupCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Action Row: Quick Add Button + Expand Accordion Toggle
+            // Action Row: Quick Add Group Button + Expand Accordion Toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Direct Add to Cart (Quick Add)
-                val addBg = if (justAddedDefault) EmeraldSavings else if (isLight) Color(0xFF0088CC) else ElectricCyan
-                val addContentColor = if (justAddedDefault) Color.White else if (isLight) Color.White else Color(0xFF091220)
+                // Direct Add Group to Cart (With Average Price)
+                val addBg = if (justAddedGroup) EmeraldSavings else if (isLight) Color(0xFF0088CC) else ElectricCyan
+                val addContentColor = if (justAddedGroup) Color.White else if (isLight) Color.White else Color(0xFF091220)
 
                 Box(
                     modifier = Modifier
@@ -1701,8 +2022,8 @@ fun ProductGroupCard(
                             try {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             } catch (_: Exception) {}
-                            onQuickAddToCart(group.defaultVariant)
-                            justAddedDefault = true
+                            onAddGroupToCart(group)
+                            justAddedGroup = true
                         }
                         .padding(horizontal = 14.dp, vertical = 7.dp)
                         .testTag("quick_add_group_${group.id}"),
@@ -1710,17 +2031,17 @@ fun ProductGroupCard(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector = if (justAddedDefault) Icons.Default.Check else Icons.Default.AddShoppingCart,
-                            contentDescription = "Add to Cart",
+                            imageVector = if (justAddedGroup) Icons.Default.Check else Icons.Default.AddShoppingCart,
+                            contentDescription = "Add Group to Cart",
                             tint = addContentColor,
                             modifier = Modifier.size(15.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (justAddedDefault) {
-                                if (isArabic) "تمت الإضافة ✓" else "Added ✓"
+                            text = if (justAddedGroup) {
+                                if (isArabic) "أُضيفت المجموعة للسلة ✓" else "Group Added ✓"
                             } else {
-                                if (isArabic) "إضافة سريعة للسلة" else "Quick Add"
+                                if (isArabic) "إضافة المجموعة (${group.avgPrice.toInt()} د.ج)" else "Add Group (${group.avgPrice.toInt()} DZD)"
                             },
                             color = addContentColor,
                             fontSize = 11.5.sp,
@@ -1785,7 +2106,7 @@ fun ProductGroupCard(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = if (isArabic) "الأصناف الفرعية والخيارات المتوفرة:" else "Available Sub-Variants:",
+                        text = if (isArabic) "الأصناف الفرعية والخيارات المتوفرة (سعر خاص وتعديل):" else "Available Sub-Variants (Special Price & Edit):",
                         color = TextSecondary,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Medium
@@ -1797,7 +2118,7 @@ fun ProductGroupCard(
                         SubVariantItemRow(
                             variant = variant,
                             isArabic = isArabic,
-                            onAddToCart = { onQuickAddToCart(variant) },
+                            onAddToCart = { onAddVariantToCart(variant) },
                             onEditPrice = { onEditVariantPrice(variant) }
                         )
                         Spacer(modifier = Modifier.height(6.dp))

@@ -20,7 +20,8 @@ data class ProductGroup(
     val variants: List<ProductVariant>,
     val minPrice: Double,
     val maxPrice: Double,
-    val defaultVariant: ProductVariant
+    val avgPrice: Double = if (variants.isNotEmpty()) (variants.map { it.priceDzd }.average()).toInt().toDouble() else minPrice,
+    val defaultVariant: ProductVariant? = null
 )
 
 object ProductGroupingUtil {
@@ -256,7 +257,10 @@ object ProductGroupingUtil {
             val sortedVariants = groupVariants.sortedBy { it.priceDzd }
             val minP = sortedVariants.firstOrNull()?.priceDzd ?: 0.0
             val maxP = sortedVariants.maxOfOrNull { it.priceDzd } ?: minP
-            val defaultVar = sortedVariants.first()
+            val defaultVar = sortedVariants.firstOrNull()
+            val avgP = if (sortedVariants.isNotEmpty()) {
+                (sortedVariants.map { it.priceDzd }.average()).toInt().toDouble()
+            } else minP
 
             ProductGroup(
                 id = family.id,
@@ -266,6 +270,7 @@ object ProductGroupingUtil {
                 variants = sortedVariants,
                 minPrice = minP,
                 maxPrice = maxP,
+                avgPrice = avgP,
                 defaultVariant = defaultVar
             )
         }.sortedByDescending { it.variants.size }

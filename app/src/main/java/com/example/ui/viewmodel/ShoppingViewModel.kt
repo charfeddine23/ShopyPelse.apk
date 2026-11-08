@@ -283,14 +283,43 @@ class ShoppingViewModel(
                 _basketSummaries.value = repository.computeBasketComparison(shoppingItems.value)
 
                 val msg = if (_isArabic.value) {
-                    "تم تحديث أسعار $updatedCount منتج أساسي تلقائياً (دورة الـ 12 ساعة)"
+                    "تم تحديث أسعار البيع بالتجزئة للزبون لـ $updatedCount منتج من كبرى المتاجر"
                 } else {
-                    "Auto-updated $updatedCount essential products (12h cycle)"
+                    "Updated consumer retail prices for $updatedCount products from supermarkets"
                 }
                 _userMessage.emit(msg)
             } finally {
                 _isSyncingPrices.value = false
             }
+        }
+    }
+
+    fun addNewProductOrGroup(
+        name: String,
+        nameAr: String,
+        storeName: String,
+        storeNameAr: String,
+        priceDzd: Double,
+        barcode: String? = null
+    ) {
+        viewModelScope.launch {
+            repository.addNewProductPrice(name, nameAr, storeName, storeNameAr, priceDzd, barcode)
+            _basketSummaries.value = repository.computeBasketComparison(shoppingItems.value)
+            val msg = if (_isArabic.value) "تمت إضافة \"$nameAr\" بنجاح بسعر التجزئة ${priceDzd.toInt()} د.ج" else "Added \"$name\" at ${priceDzd.toInt()} DZD"
+            _userMessage.emit(msg)
+        }
+    }
+
+    fun updatePrice(
+        barcode: String,
+        storeName: String?,
+        newPrice: Double
+    ) {
+        viewModelScope.launch {
+            repository.updateProductPrice(barcode, storeName, newPrice)
+            _basketSummaries.value = repository.computeBasketComparison(shoppingItems.value)
+            val msg = if (_isArabic.value) "تم تعديل السعر إلى ${newPrice.toInt()} د.ج بنجاح" else "Price updated to ${newPrice.toInt()} DZD"
+            _userMessage.emit(msg)
         }
     }
 
