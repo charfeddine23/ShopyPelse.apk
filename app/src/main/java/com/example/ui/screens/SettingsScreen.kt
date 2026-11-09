@@ -422,7 +422,7 @@ fun SettingsScreen(
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = if (isArabic) "استيراد قائمة" else "Import List",
+                                        text = if (isArabic) "استيراد القائمة" else "Import List",
                                         color = Color(0xFF06141D),
                                         fontSize = 12.5.sp,
                                         fontWeight = FontWeight.Bold,
@@ -546,7 +546,7 @@ fun SettingsScreen(
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "Backup",
+                                        text = if (isArabic) "نسخ احتياطي" else "Backup",
                                         color = EmeraldSavings,
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold
@@ -576,7 +576,7 @@ fun SettingsScreen(
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "Restore",
+                                        text = if (isArabic) "استعادة" else "Restore",
                                         color = ElectricCyan,
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold

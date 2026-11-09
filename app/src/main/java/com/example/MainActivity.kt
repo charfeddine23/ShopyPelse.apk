@@ -237,66 +237,73 @@ fun LiquidGlassBottomNavBar(
     onSelectScreen: (Screen) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 10.dp)
-            .testTag("liquid_glass_bottom_nav"),
-        contentAlignment = Alignment.Center
-    ) {
-        // Floating Dark Capsule Pill (From Screenshots)
+    // Forced LTR layout ensuring the Settings tab is permanently fixed on the FAR LEFT
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Box(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(36.dp))
-                .background(Color(0xFF0E1626))
-                .border(
-                    BorderStroke(1.dp, Color(0x33475569)),
-                    RoundedCornerShape(36.dp)
-                )
-                .padding(horizontal = 8.dp, vertical = 6.dp)
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .testTag("liquid_glass_bottom_nav"),
+            contentAlignment = Alignment.Center
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
+            // Floating Dark Capsule Pill (Neumorphic & Soft Glass)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(36.dp))
+                    .background(Color(0xFF0E1626))
+                    .border(
+                        BorderStroke(1.dp, Color(0x33475569)),
+                        RoundedCornerShape(36.dp)
+                    )
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
             ) {
-                NavItem(
-                    icon = Icons.AutoMirrored.Filled.ListAlt,
-                    label = if (isArabic) "القائمة" else "List",
-                    isSelected = currentScreen == Screen.HOME,
-                    accentColor = ElectricCyan,
-                    onClick = { onSelectScreen(Screen.HOME) },
-                    testTag = "nav_home"
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 1. Permanently Fixed on FAR LEFT: Settings Tab
+                    NavItem(
+                        icon = Icons.Default.Settings,
+                        label = if (isArabic) "الإعدادات" else "Settings",
+                        isSelected = currentScreen == Screen.SETTINGS,
+                        accentColor = NeonAmber,
+                        onClick = { onSelectScreen(Screen.SETTINGS) },
+                        testTag = "nav_settings"
+                    )
 
-                NavItem(
-                    icon = Icons.Default.QrCodeScanner,
-                    label = if (isArabic) "الماسح" else "Scanner",
-                    isSelected = currentScreen == Screen.SCANNER,
-                    accentColor = ElectricCyan,
-                    onClick = { onSelectScreen(Screen.SCANNER) },
-                    testTag = "nav_scanner"
-                )
+                    // 2. Shopping List Tab
+                    NavItem(
+                        icon = Icons.AutoMirrored.Filled.ListAlt,
+                        label = if (isArabic) "القائمة" else "List",
+                        isSelected = currentScreen == Screen.HOME,
+                        accentColor = ElectricCyan,
+                        onClick = { onSelectScreen(Screen.HOME) },
+                        testTag = "nav_home"
+                    )
 
-                NavItem(
-                    icon = Icons.AutoMirrored.Filled.CompareArrows,
-                    label = if (isArabic) "المنتجات" else "Products",
-                    isSelected = currentScreen == Screen.PRICES,
-                    accentColor = EmeraldSavings,
-                    onClick = { onSelectScreen(Screen.PRICES) },
-                    testTag = "nav_products"
-                )
+                    // 3. Barcode Scanner Tab
+                    NavItem(
+                        icon = Icons.Default.QrCodeScanner,
+                        label = if (isArabic) "الماسح" else "Scanner",
+                        isSelected = currentScreen == Screen.SCANNER,
+                        accentColor = ElectricCyan,
+                        onClick = { onSelectScreen(Screen.SCANNER) },
+                        testTag = "nav_scanner"
+                    )
 
-                NavItem(
-                    icon = Icons.Default.Settings,
-                    label = if (isArabic) "الإعدادات" else "Settings",
-                    isSelected = currentScreen == Screen.SETTINGS,
-                    accentColor = NeonAmber,
-                    onClick = { onSelectScreen(Screen.SETTINGS) },
-                    testTag = "nav_settings"
-                )
+                    // 4. Products & Price Comparison Tab
+                    NavItem(
+                        icon = Icons.AutoMirrored.Filled.CompareArrows,
+                        label = if (isArabic) "المنتجات" else "Products",
+                        isSelected = currentScreen == Screen.PRICES,
+                        accentColor = EmeraldSavings,
+                        onClick = { onSelectScreen(Screen.PRICES) },
+                        testTag = "nav_products"
+                    )
+                }
             }
         }
     }
