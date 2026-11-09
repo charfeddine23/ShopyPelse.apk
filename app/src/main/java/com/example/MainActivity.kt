@@ -34,6 +34,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -69,6 +70,7 @@ import com.example.ui.components.LiquidGlassBackground
 import com.example.ui.components.QrShareDialog
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.PriceComparisonScreen
+import com.example.ui.screens.ScannerScreen
 import com.example.ui.screens.StatisticsScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SupermarketModeScreen
@@ -83,6 +85,7 @@ import com.example.ui.viewmodel.ShoppingViewModelFactory
 
 enum class Screen {
     HOME,
+    SCANNER,
     STATISTICS,
     PRICES,
     SUPERMARKET,
@@ -179,6 +182,7 @@ fun ShopyPulseApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
                             onNavigateToPriceComparison = { currentScreen = Screen.PRICES },
                             onNavigateToSupermarketMode = { currentScreen = Screen.SUPERMARKET },
                             onNavigateToSettings = { currentScreen = Screen.SETTINGS },
+                            onNavigateToStatistics = { currentScreen = Screen.STATISTICS },
                             onOpenQrShare = { showQrShareDialog = true }
                         )
 
@@ -201,6 +205,11 @@ fun ShopyPulseApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
                             viewModel = viewModel,
                             onBack = { currentScreen = Screen.HOME },
                             onOpenQrShare = { showQrShareDialog = true }
+                        )
+
+                        Screen.STATISTICS -> StatisticsScreen(
+                            viewModel = viewModel,
+                            onBack = { currentScreen = Screen.HOME }
                         )
                     }
                 }
