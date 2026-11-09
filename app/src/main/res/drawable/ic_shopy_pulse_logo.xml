@@ -1,0 +1,80 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <!-- Transparent Background Logo for in-app UI, Splash, and TopBars -->
+    <!-- Shopping Bag Handle -->
+    <path
+        android:pathData="M19,17 L19,13 C19,10.24 21.24,8 24,8 C26.76,8 29,10.24 29,13 L29,17"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="19"
+                android:startY="8"
+                android:endX="29"
+                android:endY="17"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#00E5FF" />
+                <item android:offset="1.0" android:color="#00D09E" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Shopping Bag Body (Subtle translucent glass) -->
+    <path
+        android:pathData="M14.5,17 L33.5,17 C35.1,17 36.3,18.2 36.1,19.8 L34.1,37.8 C33.9,39.1 32.8,40 31.5,40 L16.5,40 C15.2,40 14.1,39.1 13.9,37.8 L11.9,19.8 C11.7,18.2 12.9,17 14.5,17 Z"
+        android:fillColor="#1500E5FF" />
+
+    <!-- Shopping Bag Outline -->
+    <path
+        android:pathData="M14.5,17 L33.5,17 C35.1,17 36.3,18.2 36.1,19.8 L34.1,37.8 C33.9,39.1 32.8,40 31.5,40 L16.5,40 C15.2,40 14.1,39.1 13.9,37.8 L11.9,19.8 C11.7,18.2 12.9,17 14.5,17 Z"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="12"
+                android:startY="17"
+                android:endX="36"
+                android:endY="40"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#00E5FF" />
+                <item android:offset="0.5" android:color="#FFFFFF" />
+                <item android:offset="1.0" android:color="#00D09E" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Pulse Heartbeat Waveform -->
+    <path
+        android:pathData="M9,28 L18,28 L20.5,23 L22.5,33 L25,21.5 L27.5,31 L29.5,28 L39,28"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="9"
+                android:startY="28"
+                android:endX="39"
+                android:endY="28"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#00E5FF" />
+                <item android:offset="0.55" android:color="#FFFFFF" />
+                <item android:offset="1.0" android:color="#00D09E" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Peak Dot -->
+    <path
+        android:pathData="M25,18.5 A1.4,1.4 0 1,1 25,18.49"
+        android:fillColor="#00E5FF" />
+</vector>

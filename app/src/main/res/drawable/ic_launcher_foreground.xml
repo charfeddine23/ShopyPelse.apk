@@ -1,39 +1,86 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    
+
+    <!-- Transparent Background - Content strictly within 66dp Safe Zone (x:21-87, y:21-87) -->
     <group
         android:translateX="0"
         android:translateY="0">
 
-        <!-- Shopping Bag Body -->
+        <!-- Shopping Bag Handle (Smooth Arc) -->
         <path
-            android:pathData="M34,42 L74,42 C76.2,42 78,43.8 78,46 L74.4,76 C74.2,78.2 72.4,80 70.2,80 L37.8,80 C35.6,80 33.8,78.2 33.6,76 L30,46 C30,43.8 31.8,42 34,42 Z"
-            android:strokeWidth="3.5"
-            android:strokeColor="?android:attr/colorForeground"
+            android:pathData="M44,40 L44,32 C44,26.48 48.48,22 54,22 C59.52,22 64,26.48 64,32 L64,40"
+            android:strokeWidth="4"
             android:strokeLineCap="round"
             android:strokeLineJoin="round"
-            android:fillColor="#00000000" />
+            android:fillColor="#00000000">
+            <aapt:attr name="android:strokeColor">
+                <gradient
+                    android:startX="44"
+                    android:startY="22"
+                    android:endX="64"
+                    android:endY="40"
+                    android:type="linear">
+                    <item android:offset="0.0" android:color="#00E5FF" />
+                    <item android:offset="1.0" android:color="#00D09E" />
+                </gradient>
+            </aapt:attr>
+        </path>
 
-        <!-- Pulse-Style Handles (Integrated Pulse Line) -->
+        <!-- Shopping Bag Base Body Fill (Slight tinted glass for contrast on any background) -->
         <path
-            android:pathData="M42,42 L42,35 C42,28.37 47.37,23 54,23 C60.63,23 66,28.37 66,35 L66,42"
-            android:strokeWidth="3.5"
-            android:strokeColor="?android:attr/colorForeground"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round"
-            android:fillColor="#00000000" />
+            android:pathData="M36,40 L72,40 C74.76,40 76.94,42.24 76.65,44.98 L73.15,75.98 C72.87,78.27 70.93,80 68.62,80 L39.38,80 C37.07,80 35.13,78.27 34.85,75.98 L31.35,44.98 C31.06,42.24 33.24,40 36,40 Z"
+            android:fillColor="#1A00E5FF" />
 
-        <!-- Dynamic Pulse Wave Inside the Bag -->
+        <!-- Shopping Bag Outline -->
         <path
-            android:pathData="M37,60 L44,60 L48,51 L53,69 L57,56 L61,60 L71,60"
+            android:pathData="M36,40 L72,40 C74.76,40 76.94,42.24 76.65,44.98 L73.15,75.98 C72.87,78.27 70.93,80 68.62,80 L39.38,80 C37.07,80 35.13,78.27 34.85,75.98 L31.35,44.98 C31.06,42.24 33.24,40 36,40 Z"
             android:strokeWidth="3.5"
-            android:strokeColor="?android:attr/colorForeground"
             android:strokeLineCap="round"
             android:strokeLineJoin="round"
-            android:fillColor="#00000000" />
+            android:fillColor="#00000000">
+            <aapt:attr name="android:strokeColor">
+                <gradient
+                    android:startX="31"
+                    android:startY="40"
+                    android:endX="77"
+                    android:endY="80"
+                    android:type="linear">
+                    <item android:offset="0.0" android:color="#00E5FF" />
+                    <item android:offset="0.5" android:color="#FFFFFF" />
+                    <item android:offset="1.0" android:color="#00D09E" />
+                </gradient>
+            </aapt:attr>
+        </path>
+
+        <!-- Dynamic Pulse Waveform (Shopping Heartbeat & Deal Rhythm) -->
+        <path
+            android:pathData="M27,61 L42,61 L46.5,52 L50.5,69 L55,49 L59,66 L62.5,61 L81,61"
+            android:strokeWidth="4"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000">
+            <aapt:attr name="android:strokeColor">
+                <gradient
+                    android:startX="27"
+                    android:startY="61"
+                    android:endX="81"
+                    android:endY="61"
+                    android:type="linear">
+                    <item android:offset="0.0" android:color="#00E5FF" />
+                    <item android:offset="0.55" android:color="#FFFFFF" />
+                    <item android:offset="1.0" android:color="#00D09E" />
+                </gradient>
+            </aapt:attr>
+        </path>
+
+        <!-- Peak Pulse Spark Dot (Highlighting Best Price / Deal Peak) -->
+        <path
+            android:pathData="M55,43 A2.5,2.5 0 1,1 55,42.99"
+            android:fillColor="#00E5FF" />
 
     </group>
 </vector>

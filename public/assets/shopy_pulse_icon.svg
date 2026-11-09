@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108" fill="none">
+  <defs>
+    <!-- Cyan to Emerald Gradient for Handles & Pulse -->
+    <linearGradient id="cyanToEmerald" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00E5FF" />
+      <stop offset="100%" stop-color="#00D09E" />
+    </linearGradient>
+
+    <!-- Gradient with Center White Luminance for Outline & Pulse -->
+    <linearGradient id="pulseGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00E5FF" />
+      <stop offset="55%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#00D09E" />
+    </linearGradient>
+
+    <!-- Ambient Glow Filter -->
+    <filter id="subtleGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.5" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- 1. Shopping Bag Handle (Smooth Minimalist Arch) -->
+  <path d="M44 40V32C44 26.4772 48.4772 22 54 22C59.5228 22 64 26.4772 64 32V40" 
+        stroke="url(#cyanToEmerald)" 
+        stroke-width="4" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" />
+
+  <!-- 2. Shopping Bag Body (Subtle translucent glass tint for dual Light & Dark contrast) -->
+  <path d="M36 40H72C74.7614 40 76.9404 42.24 76.65 44.98L73.15 75.98C72.87 78.27 70.93 80 68.62 80H39.38C37.07 80 35.13 78.27 34.85 75.98L31.35 44.98C31.06 42.24 33.24 40 36 40Z" 
+        fill="#00E5FF" 
+        fill-opacity="0.08" />
+
+  <!-- 3. Shopping Bag Body Outline -->
+  <path d="M36 40H72C74.7614 40 76.9404 42.24 76.65 44.98L73.15 75.98C72.87 78.27 70.93 80 68.62 80H39.38C37.07 80 35.13 78.27 34.85 75.98L31.35 44.98C31.06 42.24 33.24 40 36 40Z" 
+        stroke="url(#pulseGlow)" 
+        stroke-width="3.5" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" />
+
+  <!-- 4. Dynamic Pulse Waveform (Shopping Deal Heartbeat) -->
+  <path d="M27 61H42L46.5 52L50.5 69L55 49L59 66L62.5 61H81" 
+        stroke="url(#pulseGlow)" 
+        stroke-width="4" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" 
+        filter="url(#subtleGlow)" />
+
+  <!-- 5. Deal Peak Focal Spark -->
+  <circle cx="55" cy="43" r="2.5" fill="#00E5FF" />
+</svg>
