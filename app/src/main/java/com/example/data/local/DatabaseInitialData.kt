@@ -178,4 +178,40 @@ object DatabaseInitialData {
         PriceHistory(barcode = "6130002000456", storeName = "Uno Hypermarket", priceDzd = 635.0, dateLabel = "Sep"),
         PriceHistory(barcode = "6130002000456", storeName = "Uno Hypermarket", priceDzd = 620.0, dateLabel = "Oct")
     )
+
+    val initialSpendingRecords = listOf(
+        com.example.data.model.SpendingRecord(
+            timestamp = System.currentTimeMillis() - 4 * 86400000L,
+            monthKey = "2026-11",
+            dateStr = "04/11/2026",
+            totalSpentDzd = 4850.0,
+            itemsCount = 9,
+            storeName = "Uno Hypermarket",
+            storeNameAr = "هايبرماركت أونو",
+            itemsSummary = "حليب، زيت عافية، سكر سيفيتال، بيض مزارع طازج",
+            topCategory = "Dairy"
+        ),
+        com.example.data.model.SpendingRecord(
+            timestamp = System.currentTimeMillis() - 2 * 86400000L,
+            monthKey = "2026-11",
+            dateStr = "06/11/2026",
+            totalSpentDzd = 6240.0,
+            itemsCount = 13,
+            storeName = "Ardis Alger",
+            storeNameAr = "أرديس الجزائر",
+            itemsSummary = "دجاج بلدي طازج، مسحوق غسيل إيزيس، عصير رامي",
+            topCategory = "Meat"
+        ),
+        com.example.data.model.SpendingRecord(
+            timestamp = System.currentTimeMillis() - 12 * 86400000L,
+            monthKey = "2026-10",
+            dateStr = "27/10/2026",
+            totalSpentDzd = 5120.0,
+            itemsCount = 11,
+            storeName = "Superette El Baraka",
+            storeNameAr = "سوبرماركت البركة",
+            itemsSummary = "سميد، طماطم مصبرة، تونة بالزيت، مياه إيفري",
+            topCategory = "Pantry"
+        )
+    )
 }

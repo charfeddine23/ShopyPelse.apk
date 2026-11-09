@@ -33,7 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.automirrored.filled.ListAlt
-import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -69,7 +69,7 @@ import com.example.ui.components.LiquidGlassBackground
 import com.example.ui.components.QrShareDialog
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.PriceComparisonScreen
-import com.example.ui.screens.ScannerScreen
+import com.example.ui.screens.StatisticsScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SupermarketModeScreen
 import com.example.ui.theme.ElectricCyan
@@ -83,7 +83,7 @@ import com.example.ui.viewmodel.ShoppingViewModelFactory
 
 enum class Screen {
     HOME,
-    SCANNER,
+    STATISTICS,
     PRICES,
     SUPERMARKET,
     SETTINGS
@@ -98,7 +98,7 @@ class MainActivity : BaseActivity() {
         enableEdgeToEdge()
 
         val database = AppDatabase.getDatabase(applicationContext, lifecycleScope)
-        val repository = ShoppingRepository(database.shoppingDao(), database.marketPriceDao())
+        val repository = ShoppingRepository(database.shoppingDao(), database.marketPriceDao(), database.spendingDao())
         val factory = ShoppingViewModelFactory(repository)
         viewModel = ViewModelProvider(this, factory)[ShoppingViewModel::class.java]
 

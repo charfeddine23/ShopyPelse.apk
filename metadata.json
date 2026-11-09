@@ -1,6 +1,6 @@
 {
   "name": "Shopy Pulse",
-  "description": "Liquid Glass M5 smart shopping & market price comparison with offline-first Room database, barcode scanner, DZD currency, and basket price optimizer.",
+  "description": "Smart shopping & market price comparison with offline-first Room database, barcode scanner, DZD currency, and basket price optimizer.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

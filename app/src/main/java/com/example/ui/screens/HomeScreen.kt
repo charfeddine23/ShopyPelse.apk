@@ -37,6 +37,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -50,6 +51,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -61,6 +63,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -125,11 +128,12 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeScreen(
     viewModel: ShoppingViewModel,
-    onNavigateToScanner: () -> Unit,
+    onNavigateToStatistics: () -> Unit = {},
     onNavigateToPriceComparison: () -> Unit,
     onNavigateToSupermarketMode: () -> Unit,
     onNavigateToSettings: () -> Unit = {},
     onOpenQrShare: () -> Unit = {},
+    onNavigateToScanner: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val items by viewModel.shoppingItems.collectAsStateWithLifecycle()
@@ -138,6 +142,7 @@ fun HomeScreen(
     val basketSummaries by viewModel.basketSummaries.collectAsStateWithLifecycle()
 
     var showAddDialog by remember { mutableStateOf(false) }
+    var showFinishTripDialog by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
 
@@ -175,6 +180,7 @@ fun HomeScreen(
                 HomeSummaryHud(
                     stats = stats,
                     isArabic = isArabic,
+                    onFinishShopping = { showFinishTripDialog = true },
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
@@ -342,6 +348,93 @@ fun HomeScreen(
                 }
             )
         }
+
+        // Finish Shopping Trip & Transfer to Analytics Dialog
+        if (showFinishTripDialog) {
+            val stores = listOf(
+                Pair("Uno Hypermarket", "هايبرماركت أونو"),
+                Pair("Ardis Alger", "أرديس الجزائر"),
+                Pair("Carrefour Alger", "كارفور الجزائر"),
+                Pair("Superette El Baraka", "سوبرماركت البركة"),
+                Pair("Superette En-Nour", "سوبرماركت النور")
+            )
+            var selectedStoreIndex by remember { mutableStateOf(0) }
+            val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+
+            AlertDialog(
+                onDismissRequest = { showFinishTripDialog = false },
+                containerColor = if (isLight) Color.White else Color(0xFF131D2E),
+                title = {
+                    Text(
+                        text = if (isArabic) "إنهاء التسوق ونقل المجموع للإنفاق" else "Finish Shopping Trip",
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = if (isArabic)
+                                "سيتم إنهاء التسوق ونقل مجموع السلة المقدر بـ ${LocalizationUtil.formatDzd(stats.grandTotalDzd, isArabic)} فورياً إلى صفحة الإحصائيات والإنفاق وتفريغ السلة."
+                            else
+                                "This will transfer ${LocalizationUtil.formatDzd(stats.grandTotalDzd, isArabic)} to your monthly spending analytics and clear the cart.",
+                            color = TextSecondary,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = if (isArabic) "اختر متجر الشراء:" else "Select store:",
+                            color = TextPrimary,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            stores.forEachIndexed { index, (en, ar) ->
+                                val isSelected = selectedStoreIndex == index
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isSelected) (if (isLight) CyanTintBg else ElectricCyan.copy(alpha = 0.25f)) else (if (isLight) Color(0xFFF1F5F9) else Color(0x18FFFFFF)))
+                                        .border(BorderStroke(1.dp, if (isSelected) ElectricCyan else Color.Transparent), RoundedCornerShape(8.dp))
+                                        .clickable { selectedStoreIndex = index }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        text = if (isArabic) ar else en,
+                                        color = if (isSelected) (if (isLight) CyanTintText else ElectricCyan) else TextSecondary,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    GlowingActionButton(
+                        text = if (isArabic) "تأكيد ونقل للإحصائيات" else "Confirm & Transfer",
+                        color = EmeraldSavings,
+                        onClick = {
+                            val store = stores[selectedStoreIndex]
+                            viewModel.finishShoppingTrip(storeName = store.first, storeNameAr = store.second)
+                            showFinishTripDialog = false
+                        }
+                    )
+                },
+                dismissButton = {
+                    TextButton(onClick = { showFinishTripDialog = false }) {
+                        Text(if (isArabic) "إلغاء" else "Cancel", color = TextSecondary)
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -411,6 +504,7 @@ private fun HomeHeader(
 private fun HomeSummaryHud(
     stats: com.example.ui.viewmodel.ShoppingStats,
     isArabic: Boolean,
+    onFinishShopping: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isLight = MaterialTheme.colorScheme.background == BackgroundLight
@@ -446,20 +540,55 @@ private fun HomeSummaryHud(
                 val ratioBorder = if (isLight) BorderStroke(1.dp, CyanTintBorder) else BorderStroke(1.dp, Color(0x20FFFFFF))
                 val ratioText = if (isLight) CyanTintText else ElectricCyan
 
-                // Progress ratio pill
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(ratioBg)
-                        .border(ratioBorder, RoundedCornerShape(12.dp))
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = "${stats.checkedCount}/${stats.totalCount} " + if (isArabic) "جاهز" else "done",
-                        color = ratioText,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                Column(horizontalAlignment = Alignment.End) {
+                    // Progress ratio pill
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(ratioBg)
+                            .border(ratioBorder, RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "${stats.checkedCount}/${stats.totalCount} " + if (isArabic) "جاهز" else "done",
+                            color = ratioText,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    if (stats.totalCount > 0) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (isLight) MintTintBg else EmeraldSavings.copy(alpha = 0.22f))
+                                .border(
+                                    BorderStroke(1.dp, if (isLight) MintTintBorder else EmeraldSavings.copy(alpha = 0.65f)),
+                                    RoundedCornerShape(10.dp)
+                                )
+                                .clickable(onClick = onFinishShopping)
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                .testTag("finish_shopping_hud_button"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = if (isLight) MintTintText else EmeraldSavings,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Text(
+                                    text = if (isArabic) "إنهاء التسوق" else "Finish Trip",
+                                    color = if (isLight) MintTintText else EmeraldSavings,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

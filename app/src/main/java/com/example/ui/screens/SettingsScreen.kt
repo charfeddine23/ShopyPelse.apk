@@ -224,11 +224,11 @@ fun SettingsScreen(
                 }
             }
 
-            // 2. Appearance: Dark / Light Mode
+            // 2. Appearance: Theme
             item {
                 SettingsSectionHeader(
                     icon = if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
-                    title = if (isArabic) "المظهر (الوضع الليلي والنهاري)" else "Theme (Dark & Light Mode)",
+                    title = "Theme",
                     accentColor = NeonAmber
                 )
 
@@ -236,14 +236,6 @@ fun SettingsScreen(
 
                 LiquidGlassCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = if (isArabic) "نمط الواجهة والتصميم الزجاجي:" else "Interface Liquid Glass styling:",
-                            color = TextSecondary,
-                            fontSize = 13.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -251,7 +243,6 @@ fun SettingsScreen(
                             ThemeOptionPill(
                                 icon = Icons.Default.DarkMode,
                                 title = if (isArabic) "الوضع الليلي" else "Dark Mode",
-                                subtitle = "Liquid Glass M5",
                                 isSelected = isDarkMode,
                                 onClick = { viewModel.setDarkMode(true) },
                                 modifier = Modifier.weight(1f)
@@ -260,7 +251,6 @@ fun SettingsScreen(
                             ThemeOptionPill(
                                 icon = Icons.Default.LightMode,
                                 title = if (isArabic) "الوضع النهاري" else "Light Mode",
-                                subtitle = "Frosted Daylight",
                                 isSelected = !isDarkMode,
                                 onClick = { viewModel.setDarkMode(false) },
                                 modifier = Modifier.weight(1f)
@@ -344,46 +334,6 @@ fun SettingsScreen(
                             lineHeight = 18.sp
                         )
 
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // Highlights Row
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(EmeraldSavings.copy(alpha = 0.12f))
-                                    .border(BorderStroke(1.dp, EmeraldSavings.copy(alpha = 0.3f)), RoundedCornerShape(8.dp))
-                                    .padding(vertical = 5.dp, horizontal = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = if (isArabic) "⚡ نقل فوري بدون شبكة" else "⚡ Instant Offline",
-                                    color = EmeraldSavings,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(ElectricCyan.copy(alpha = 0.12f))
-                                    .border(BorderStroke(1.dp, ElectricCyan.copy(alpha = 0.3f)), RoundedCornerShape(8.dp))
-                                    .padding(vertical = 5.dp, horizontal = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = if (isArabic) "🔒 مشفر ومحلي 100%" else "🔒 100% Encrypted",
-                                    color = ElectricCyan,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
 
                         Spacer(modifier = Modifier.height(14.dp))
 
@@ -736,7 +686,7 @@ fun SettingsScreen(
 
                         InfoRow(
                             label = if (isArabic) "الواجهة والتقنيات" else "Tech Stack",
-                            value = "Jetpack Compose • Liquid Glass M5 • Room DB"
+                            value = "Jetpack Compose • Room DB"
                         )
                     }
                 }
@@ -834,10 +784,10 @@ private fun LanguageOptionPill(
 private fun ThemeOptionPill(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
-    subtitle: String,
     isSelected: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    subtitle: String? = null
 ) {
     val isLight = MaterialTheme.colorScheme.background == BackgroundLight
     val pillBg = if (isLight) {
@@ -858,9 +808,13 @@ private fun ThemeOptionPill(
             .background(pillBg)
             .border(pillBorder, RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .padding(12.dp)
+            .padding(vertical = 12.dp, horizontal = 14.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
@@ -872,14 +826,16 @@ private fun ThemeOptionPill(
                 Text(
                     text = title,
                     color = if (isSelected) pillAccent else TextPrimary,
-                    fontSize = 13.sp,
+                    fontSize = 13.5.sp,
                     fontWeight = FontWeight.Bold
                 )
-                Text(
-                    text = subtitle,
-                    color = TextSecondary,
-                    fontSize = 10.sp
-                )
+                if (subtitle != null && subtitle.isNotBlank()) {
+                    Text(
+                        text = subtitle,
+                        color = TextSecondary,
+                        fontSize = 10.sp
+                    )
+                }
             }
         }
     }

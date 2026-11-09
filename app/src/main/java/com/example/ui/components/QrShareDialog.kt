@@ -319,26 +319,6 @@ fun QrShareDialog(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Encrypted Offline Pill
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isLight) MintTintBg else Color(0x1F10B981))
-                            .border(
-                                BorderStroke(1.dp, if (isLight) MintTintBorder else EmeraldSavings.copy(alpha = 0.35f)),
-                                RoundedCornerShape(8.dp)
-                            )
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
-                    ) {
-                        Text(
-                            text = if (isArabic) "🔒 مشفر ومحلي 100% • بدون استهلاك إنترنت" else "🔒 100% Local & Encrypted • Zero Data Needed",
-                            color = if (isLight) MintTintText else EmeraldSavings,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
 
                     Spacer(modifier = Modifier.height(12.dp))
 

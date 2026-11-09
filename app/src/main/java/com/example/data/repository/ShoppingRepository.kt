@@ -2,19 +2,35 @@ package com.example.data.repository
 
 import com.example.data.local.MarketPriceDao
 import com.example.data.local.ShoppingDao
+import com.example.data.local.SpendingDao
+import com.example.data.local.DatabaseInitialData
 import com.example.data.model.MarketPrice
 import com.example.data.model.PriceHistory
 import com.example.data.model.ShoppingItem
+import com.example.data.model.SpendingRecord
 import com.example.data.model.StoreBasketSummary
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 
 class ShoppingRepository(
     private val shoppingDao: ShoppingDao,
-    private val marketPriceDao: MarketPriceDao
+    private val marketPriceDao: MarketPriceDao,
+    private val spendingDao: SpendingDao
 ) {
     val allShoppingItems: Flow<List<ShoppingItem>> = shoppingDao.getAllShoppingItems()
     val allMarketPrices: Flow<List<MarketPrice>> = marketPriceDao.getAllMarketPrices()
+    val allSpendingRecords: Flow<List<SpendingRecord>> = spendingDao.getAllSpendingRecords()
+
+    suspend fun recordShoppingTrip(record: SpendingRecord): Long = spendingDao.insertSpendingRecord(record)
+
+    suspend fun deleteSpendingRecord(id: Long) = spendingDao.deleteSpendingRecord(id)
+
+    suspend fun ensureSpendingSeeded() {
+        val records = spendingDao.getAllSpendingRecords().first()
+        if (records.isEmpty()) {
+            spendingDao.insertSpendingRecords(DatabaseInitialData.initialSpendingRecords)
+        }
+    }
 
     suspend fun insertItem(item: ShoppingItem): Long {
         val detected = autoCategorize(item.name, item.nameAr)

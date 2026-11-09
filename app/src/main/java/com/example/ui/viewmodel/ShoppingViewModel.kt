@@ -7,6 +7,7 @@ import com.example.data.local.DatabaseInitialData
 import com.example.data.model.MarketPrice
 import com.example.data.model.PriceHistory
 import com.example.data.model.ShoppingItem
+import com.example.data.model.SpendingRecord
 import com.example.data.model.StoreBasketSummary
 import com.example.data.repository.ShoppingRepository
 import com.example.util.LocalizationUtil
@@ -33,8 +34,8 @@ class ShoppingViewModel(
     companion object {
         const val DEVELOPER_NAME = "Developed by Charfeddine Ka"
         const val APP_VERSION = "v1.0 (Build 1)"
-        const val LAST_UPDATE_DATE_AR = "3 نوفمبر 2026"
-        const val LAST_UPDATE_DATE_EN = "November 3, 2026"
+        const val LAST_UPDATE_DATE_AR = "08/11/2026"
+        const val LAST_UPDATE_DATE_EN = "08/11/2026"
     }
 
     val shoppingItems: StateFlow<List<ShoppingItem>> = repository.allShoppingItems
@@ -45,6 +46,13 @@ class ShoppingViewModel(
         )
 
     val marketPrices: StateFlow<List<MarketPrice>> = repository.allMarketPrices
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val spendingRecords: StateFlow<List<SpendingRecord>> = repository.allSpendingRecords
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -106,8 +114,9 @@ class ShoppingViewModel(
 
         // Automatic 12-hour price refresh loop & initial category sanitization
         viewModelScope.launch {
-            // Ensure 1000 items catalog is loaded
+            // Ensure 5000 items catalog is loaded
             repository.ensureCatalogPopulated()
+            repository.ensureSpendingSeeded()
 
             // Correct any previously misclassified categories
             repository.sanitizeExistingItemCategories()
@@ -434,6 +443,106 @@ class ShoppingViewModel(
                 val msg = if (_isArabic.value) "خطأ في ملف النسخة الاحتياطية" else "Invalid backup file format"
                 _userMessage.emit(msg)
             }
+        }
+    }
+
+    /**
+     * Completes current shopping trip and transfers total spent immediately to monthly statistics
+     */
+    fun finishShoppingTrip(
+        storeName: String = "Uno Hypermarket",
+        storeNameAr: String = "هايبرماركت أونو",
+        customTotal: Double? = null
+    ) {
+        viewModelScope.launch {
+            val currentItems = shoppingItems.value
+            if (currentItems.isEmpty() && (customTotal == null || customTotal <= 0.0)) {
+                _userMessage.emit(if (_isArabic.value) "قائمة المشتريات فارغة، أضف بعض المنتجات أولاً" else "Shopping list is empty")
+                return@launch
+            }
+
+            // If some items are checked, use checked items, otherwise all items
+            val targetItems = if (currentItems.any { it.isChecked }) currentItems.filter { it.isChecked } else currentItems
+            val total = customTotal ?: targetItems.sumOf { 
+                (if (it.estimatedPriceDzd > 0) it.estimatedPriceDzd else 120.0) * it.quantity 
+            }
+            val count = targetItems.sumOf { it.quantity }
+
+            val now = System.currentTimeMillis()
+            val monthFormatter = SimpleDateFormat("yyyy-MM", Locale.US)
+            val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.US)
+            val monthKey = monthFormatter.format(Date(now))
+            val dateStr = dateFormatter.format(Date(now))
+
+            val summaryText = targetItems.take(4).joinToString("، ") { if (_isArabic.value) it.nameAr else it.name }
+            val topCategory = targetItems.groupBy { it.category }.maxByOrNull { it.value.size }?.key ?: "Grocery"
+
+            val record = SpendingRecord(
+                timestamp = now,
+                monthKey = monthKey,
+                dateStr = dateStr,
+                totalSpentDzd = total,
+                itemsCount = if (count > 0) count else 1,
+                storeName = storeName,
+                storeNameAr = storeNameAr,
+                itemsSummary = summaryText,
+                topCategory = topCategory
+            )
+
+            repository.recordShoppingTrip(record)
+
+            // Clear the purchased items from list
+            if (currentItems.any { it.isChecked }) {
+                repository.clearCheckedItems()
+            } else {
+                for (item in currentItems) {
+                    repository.deleteItem(item)
+                }
+            }
+
+            val formatted = LocalizationUtil.formatDzd(total, _isArabic.value)
+            _userMessage.emit(
+                if (_isArabic.value) "تم إنهاء التسوق ونقل $formatted فوراً إلى الإحصائيات الشهرية!"
+                else "Shopping finished! $formatted transferred to monthly analytics."
+            )
+        }
+    }
+
+    fun addManualSpendingTrip(
+        storeName: String,
+        storeNameAr: String,
+        totalDzd: Double,
+        itemsCount: Int,
+        category: String,
+        notes: String
+    ) {
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val monthFormatter = SimpleDateFormat("yyyy-MM", Locale.US)
+            val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.US)
+            val monthKey = monthFormatter.format(Date(now))
+            val dateStr = dateFormatter.format(Date(now))
+
+            val record = SpendingRecord(
+                timestamp = now,
+                monthKey = monthKey,
+                dateStr = dateStr,
+                totalSpentDzd = totalDzd,
+                itemsCount = itemsCount,
+                storeName = storeName,
+                storeNameAr = storeNameAr,
+                itemsSummary = notes,
+                topCategory = category
+            )
+            repository.recordShoppingTrip(record)
+            _userMessage.emit(if (_isArabic.value) "تم تسجيل النفقة في الإحصائيات بنجاح" else "Expense logged successfully")
+        }
+    }
+
+    fun deleteSpendingRecord(id: Long) {
+        viewModelScope.launch {
+            repository.deleteSpendingRecord(id)
+            _userMessage.emit(if (_isArabic.value) "تم حذف السجل من الإحصائيات" else "Record deleted")
         }
     }
 

@@ -12,14 +12,17 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+import com.example.data.model.SpendingRecord
+
 @Database(
-    entities = [ShoppingItem::class, MarketPrice::class, PriceHistory::class],
-    version = 1,
+    entities = [ShoppingItem::class, MarketPrice::class, PriceHistory::class, SpendingRecord::class],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun shoppingDao(): ShoppingDao
     abstract fun marketPriceDao(): MarketPriceDao
+    abstract fun spendingDao(): SpendingDao
 
     companion object {
         @Volatile
@@ -48,15 +51,16 @@ abstract class AppDatabase : RoomDatabase() {
             super.onCreate(db)
             INSTANCE?.let { database ->
                 scope.launch(Dispatchers.IO) {
-                    populateDatabase(database.shoppingDao(), database.marketPriceDao())
+                    populateDatabase(database.shoppingDao(), database.marketPriceDao(), database.spendingDao())
                 }
             }
         }
 
-        suspend fun populateDatabase(shoppingDao: ShoppingDao, marketPriceDao: MarketPriceDao) {
+        suspend fun populateDatabase(shoppingDao: ShoppingDao, marketPriceDao: MarketPriceDao, spendingDao: SpendingDao) {
             shoppingDao.insertItems(DatabaseInitialData.initialShoppingItems)
             marketPriceDao.insertMarketPrices(DatabaseInitialData.initialMarketPrices)
             marketPriceDao.insertPriceHistories(DatabaseInitialData.initialPriceHistories)
+            spendingDao.insertSpendingRecords(DatabaseInitialData.initialSpendingRecords)
 
             // Insert 5,000 realistic Algerian grocery and supermarket products
             val catalog5000 = CatalogDataGenerator.generate5000Products()
