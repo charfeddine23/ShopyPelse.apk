@@ -133,7 +133,6 @@ fun HomeScreen(
     onNavigateToSupermarketMode: () -> Unit,
     onNavigateToSettings: () -> Unit = {},
     onOpenQrShare: () -> Unit = {},
-    onNavigateToScanner: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val items by viewModel.shoppingItems.collectAsStateWithLifecycle()
@@ -339,12 +338,6 @@ fun HomeScreen(
                 onAddItem = { name, nameAr, category, qty, unit, barcode, price ->
                     viewModel.addItem(name, nameAr, category, qty, unit, barcode, price)
                     scope.launch { sheetState.hide() }.invokeOnCompletion { showAddDialog = false }
-                },
-                onScanBarcode = {
-                    scope.launch { sheetState.hide() }.invokeOnCompletion {
-                        showAddDialog = false
-                        onNavigateToScanner()
-                    }
                 }
             )
         }
@@ -1011,8 +1004,7 @@ fun AddItemSheetContent(
     availableProducts: List<com.example.data.model.MarketPrice> = emptyList(),
     onDismiss: () -> Unit,
     onAutoCategorize: (name: String, nameAr: String) -> String,
-    onAddItem: (name: String, nameAr: String, category: String, qty: Int, unit: String, barcode: String?, price: Double) -> Unit,
-    onScanBarcode: () -> Unit
+    onAddItem: (name: String, nameAr: String, category: String, qty: Int, unit: String, barcode: String?, price: Double) -> Unit
 ) {
     var productSearchQuery by remember { mutableStateOf("") }
     var isManualEntryExpanded by remember { mutableStateOf(false) }
@@ -1429,15 +1421,6 @@ fun AddItemSheetContent(
                         value = manualBarcode,
                         onValueChange = { manualBarcode = it },
                         label = { Text(if (isArabic) "الرمز الشريطي / باركود (اختياري)" else "Barcode (Optional)") },
-                        trailingIcon = {
-                            IconButton(onClick = onScanBarcode) {
-                                Icon(
-                                    imageVector = Icons.Default.QrCodeScanner,
-                                    contentDescription = "Scan",
-                                    tint = ElectricCyan
-                                )
-                            }
-                        },
                         singleLine = true,
                         modifier = Modifier
                             .fillMaxWidth()

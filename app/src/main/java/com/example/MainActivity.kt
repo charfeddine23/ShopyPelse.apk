@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -58,6 +59,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -70,7 +72,6 @@ import com.example.ui.components.LiquidGlassBackground
 import com.example.ui.components.QrShareDialog
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.PriceComparisonScreen
-import com.example.ui.screens.ScannerScreen
 import com.example.ui.screens.StatisticsScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SupermarketModeScreen
@@ -85,7 +86,6 @@ import com.example.ui.viewmodel.ShoppingViewModelFactory
 
 enum class Screen {
     HOME,
-    SCANNER,
     STATISTICS,
     PRICES,
     SUPERMARKET,
@@ -184,17 +184,11 @@ fun ShopyPulseApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
                     when (screen) {
                         Screen.HOME -> HomeScreen(
                             viewModel = viewModel,
-                            onNavigateToScanner = { currentScreen = Screen.SCANNER },
                             onNavigateToPriceComparison = { currentScreen = Screen.PRICES },
                             onNavigateToSupermarketMode = { currentScreen = Screen.SUPERMARKET },
                             onNavigateToSettings = { currentScreen = Screen.SETTINGS },
                             onNavigateToStatistics = { currentScreen = Screen.STATISTICS },
                             onOpenQrShare = { showQrShareDialog = true }
-                        )
-
-                        Screen.SCANNER -> ScannerScreen(
-                            viewModel = viewModel,
-                            onBack = { currentScreen = Screen.HOME }
                         )
 
                         Screen.PRICES -> PriceComparisonScreen(
@@ -243,80 +237,68 @@ fun LiquidGlassBottomNavBar(
     onSelectScreen: (Screen) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Forced LTR layout ensuring the Settings tab is permanently fixed on the FAR LEFT
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+    // Dynamic Layout Direction: Mirrors automatically according to language (RTL for Arabic, LTR for English)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .testTag("liquid_glass_bottom_nav"),
+        contentAlignment = Alignment.Center
+    ) {
+        // Floating Dark Capsule Pill (Neumorphic & Soft Glass)
         Box(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 10.dp)
-                .testTag("liquid_glass_bottom_nav"),
-            contentAlignment = Alignment.Center
+                .clip(RoundedCornerShape(32.dp))
+                .background(Color(0xFF0E1626))
+                .border(
+                    BorderStroke(1.dp, Color(0x33475569)),
+                    RoundedCornerShape(32.dp)
+                )
+                .padding(horizontal = 6.dp, vertical = 6.dp)
         ) {
-            // Floating Dark Capsule Pill (Neumorphic & Soft Glass)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(36.dp))
-                    .background(Color(0xFF0E1626))
-                    .border(
-                        BorderStroke(1.dp, Color(0x33475569)),
-                        RoundedCornerShape(36.dp)
-                    )
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // 1. Permanently Fixed on FAR LEFT: Settings Tab
-                    NavItem(
-                        icon = Icons.Default.Settings,
-                        label = if (isArabic) "الإعدادات" else "Settings",
-                        isSelected = currentScreen == Screen.SETTINGS,
-                        accentColor = NeonAmber,
-                        onClick = { onSelectScreen(Screen.SETTINGS) },
-                        testTag = "nav_settings"
-                    )
+                // 1. Shopping List Tab
+                NavItem(
+                    icon = Icons.AutoMirrored.Filled.ListAlt,
+                    label = if (isArabic) "القائمة" else "List",
+                    isSelected = currentScreen == Screen.HOME,
+                    accentColor = ElectricCyan,
+                    onClick = { onSelectScreen(Screen.HOME) },
+                    testTag = "nav_home"
+                )
 
-                    // 2. Shopping List Tab
-                    NavItem(
-                        icon = Icons.AutoMirrored.Filled.ListAlt,
-                        label = if (isArabic) "القائمة" else "List",
-                        isSelected = currentScreen == Screen.HOME,
-                        accentColor = ElectricCyan,
-                        onClick = { onSelectScreen(Screen.HOME) },
-                        testTag = "nav_home"
-                    )
+                // 3. Products & Price Comparison Tab
+                NavItem(
+                    icon = Icons.AutoMirrored.Filled.CompareArrows,
+                    label = if (isArabic) "المنتجات" else "Products",
+                    isSelected = currentScreen == Screen.PRICES,
+                    accentColor = EmeraldSavings,
+                    onClick = { onSelectScreen(Screen.PRICES) },
+                    testTag = "nav_products"
+                )
 
-                    // 3. Barcode Scanner Tab
-                    NavItem(
-                        icon = Icons.Default.QrCodeScanner,
-                        label = if (isArabic) "الماسح" else "Scanner",
-                        isSelected = currentScreen == Screen.SCANNER,
-                        accentColor = ElectricCyan,
-                        onClick = { onSelectScreen(Screen.SCANNER) },
-                        testTag = "nav_scanner"
-                    )
-
-                    // 4. Products & Price Comparison Tab
-                    NavItem(
-                        icon = Icons.AutoMirrored.Filled.CompareArrows,
-                        label = if (isArabic) "المنتجات" else "Products",
-                        isSelected = currentScreen == Screen.PRICES,
-                        accentColor = EmeraldSavings,
-                        onClick = { onSelectScreen(Screen.PRICES) },
-                        testTag = "nav_products"
-                    )
-                }
+                // 4. Settings Tab ("الإعدادات" on one single line in a stationary fixed position)
+                NavItem(
+                    icon = Icons.Default.Settings,
+                    label = if (isArabic) "الإعدادات" else "Settings",
+                    isSelected = currentScreen == Screen.SETTINGS,
+                    accentColor = NeonAmber,
+                    onClick = { onSelectScreen(Screen.SETTINGS) },
+                    testTag = "nav_settings"
+                )
             }
         }
     }
 }
 
 @Composable
-private fun NavItem(
+private fun RowScope.NavItem(
     icon: ImageVector,
     label: String,
     isSelected: Boolean,
@@ -326,60 +308,58 @@ private fun NavItem(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
 
-    if (isSelected) {
-        // Active Pill (Bordered glow with icon and text, matching screenshots)
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(24.dp))
-                .background(accentColor.copy(alpha = 0.16f))
-                .border(
-                    BorderStroke(1.5.dp, accentColor),
-                    RoundedCornerShape(24.dp)
-                )
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = ripple(bounded = true, color = accentColor),
-                    onClick = onClick
-                )
-                .padding(horizontal = 14.dp, vertical = 8.dp)
-                .testTag(testTag),
-            contentAlignment = Alignment.Center
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = ripple(bounded = true, color = accentColor),
+                onClick = onClick
+            )
+            .padding(vertical = 4.dp, horizontal = 2.dp)
+            .testTag(testTag),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // Icon Pill Container (Glows when selected, stays fixed in place)
+            Box(
+                modifier = Modifier
+                    .size(width = 46.dp, height = 28.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .then(
+                        if (isSelected) {
+                            Modifier
+                                .background(accentColor.copy(alpha = 0.18f))
+                                .border(BorderStroke(1.2.dp, accentColor), RoundedCornerShape(14.dp))
+                        } else {
+                            Modifier
+                        }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = label,
-                    tint = accentColor,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = label,
-                    color = accentColor,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
+                    tint = if (isSelected) accentColor else Color(0xFF64748B),
+                    modifier = Modifier.size(19.dp)
                 )
             }
-        }
-    } else {
-        // Inactive Icon (Sleek and minimalist, matching screenshots)
-        Box(
-            modifier = Modifier
-                .clip(CircleShape)
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = ripple(bounded = true, color = Color.White),
-                    onClick = onClick
-                )
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-                .testTag(testTag),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = Color(0xFF64748B),
-                modifier = Modifier.size(20.dp)
+
+            Spacer(modifier = Modifier.height(3.dp))
+
+            // Fixed Position Label: Always stationary, in one line, never wrapping or shifting!
+            Text(
+                text = label,
+                color = if (isSelected) accentColor else Color(0xFF64748B),
+                fontSize = 11.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

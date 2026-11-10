@@ -278,7 +278,10 @@ private fun SettingsScreenHeader(
                 color = TextPrimary,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.ExtraBold,
-                letterSpacing = (-0.5).sp
+                letterSpacing = (-0.5).sp,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = if (isArabic) "تخصيص التطبيق، مزامنة ونقل البيانات" else "Preferences, data sync & app settings",
@@ -477,36 +480,6 @@ private fun ThemeModeSection(
                         modifier = Modifier.testTag("theme_switch_toggle")
                     )
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Dual Selection Option Cards (Night Mode & Day Mode)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    ThemeOptionCard(
-                        icon = Icons.Default.DarkMode,
-                        title = if (isArabic) "الوضع الليلي" else "Night Mode",
-                        isSelected = isDarkMode,
-                        accentColor = ElectricCyan,
-                        onClick = { onDarkModeChange(true) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("theme_night")
-                    )
-
-                    ThemeOptionCard(
-                        icon = Icons.Default.LightMode,
-                        title = if (isArabic) "الوضع النهاري" else "Day Mode",
-                        isSelected = !isDarkMode,
-                        accentColor = NeonAmber,
-                        onClick = { onDarkModeChange(false) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("theme_day")
-                    )
-                }
             }
         }
     }
@@ -587,61 +560,6 @@ fun NeumorphicGlowingSwitch(
                 contentDescription = null,
                 tint = if (checked) Color(0xFF071422) else Color(0xFF1E1405),
                 modifier = Modifier.size(14.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun ThemeOptionCard(
-    icon: ImageVector,
-    title: String,
-    isSelected: Boolean,
-    accentColor: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
-    val cardBg = if (isLight) {
-        if (isSelected) PeachTintBg else Color.White
-    } else {
-        if (isSelected) accentColor.copy(alpha = 0.18f) else Color(0x181E293B)
-    }
-    val cardBorder = if (isLight) {
-        if (isSelected) BorderStroke(1.5.dp, PeachTintBorder) else BorderStroke(1.dp, LightCardBorder)
-    } else {
-        if (isSelected) BorderStroke(1.5.dp, accentColor) else BorderStroke(1.dp, Color(0x33475569))
-    }
-
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(cardBg)
-            .border(cardBorder, RoundedCornerShape(16.dp))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(bounded = true, color = accentColor),
-                onClick = onClick
-            )
-            .padding(vertical = 12.dp, horizontal = 12.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (isSelected) accentColor else TextSecondary,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = title,
-                color = if (isSelected) accentColor else TextPrimary,
-                fontSize = 13.5.sp,
-                fontWeight = FontWeight.Bold
             )
         }
     }
