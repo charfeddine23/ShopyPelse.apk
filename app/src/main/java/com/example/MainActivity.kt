@@ -109,14 +109,20 @@ class MainActivity : BaseActivity() {
             val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
             val isArabic by viewModel.isArabic.collectAsStateWithLifecycle()
 
-            // Direction: Left to Right (من الجهة اليسرى إلى اليمنى)
-            val ltrDirection = LayoutDirection.Ltr
+            // Dynamic Layout Direction: RTL (من اليمين لليسار) for Arabic, LTR for English
+            val currentLayoutDirection = if (isArabic) LayoutDirection.Rtl else LayoutDirection.Ltr
 
-            // Native window decorView LTR
-            window.decorView.layoutDirection = android.view.View.LAYOUT_DIRECTION_LTR
+            // Synchronize native window decorView direction dynamically
+            LaunchedEffect(isArabic) {
+                window.decorView.layoutDirection = if (isArabic) {
+                    android.view.View.LAYOUT_DIRECTION_RTL
+                } else {
+                    android.view.View.LAYOUT_DIRECTION_LTR
+                }
+            }
 
             ShopyPulseTheme(darkTheme = isDarkMode) {
-                CompositionLocalProvider(LocalLayoutDirection provides ltrDirection) {
+                CompositionLocalProvider(LocalLayoutDirection provides currentLayoutDirection) {
                     ShopyPulseApp(viewModel = viewModel, isDarkMode = isDarkMode)
                 }
             }
