@@ -281,7 +281,7 @@ private fun SettingsScreenHeader(
                 letterSpacing = (-0.5).sp,
                 maxLines = 1,
                 softWrap = false,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Clip
             )
             Text(
                 text = if (isArabic) "تخصيص التطبيق، مزامنة ونقل البيانات" else "Preferences, data sync & app settings",

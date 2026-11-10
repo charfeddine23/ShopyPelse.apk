@@ -1232,12 +1232,6 @@ fun DirectProductPriceItem(
                         color = TextSecondary,
                         fontSize = 11.sp
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "• EAN: $barcode",
-                        color = TextMuted,
-                        fontSize = 10.sp
-                    )
                 }
             }
 
@@ -1451,12 +1445,6 @@ fun ProductPriceMatrixCard(
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "EAN: $barcode",
-                        color = TextSecondary,
-                        fontSize = 11.sp
-                    )
                 }
 
                 if (diff > 0) {
@@ -1650,7 +1638,6 @@ private fun AddProductOrGroupDialog(
     var nameEn by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("Dairy") }
     var priceText by remember { mutableStateOf("") }
-    var customBarcode by remember { mutableStateOf("") }
 
     val stores = listOf(
         Pair("Uno Hypermarket", "هايبرماركت أونو"),
@@ -1864,7 +1851,7 @@ private fun AddProductOrGroupDialog(
                         store.first,
                         store.second,
                         p,
-                        customBarcode.ifBlank { null }
+                        null
                     )
                 },
                 color = EmeraldSavings

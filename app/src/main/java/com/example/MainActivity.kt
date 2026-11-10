@@ -351,15 +351,16 @@ private fun RowScope.NavItem(
 
             Spacer(modifier = Modifier.height(3.dp))
 
-            // Fixed Position Label: Always stationary, in one line, never wrapping or shifting!
+            // Fixed Position Label: Always stationary, in one line, fully visible without truncation
             Text(
                 text = label,
                 color = if (isSelected) accentColor else Color(0xFF64748B),
-                fontSize = 11.sp,
+                fontSize = 10.5.sp,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                letterSpacing = (-0.2).sp,
                 maxLines = 1,
                 softWrap = false,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Clip
             )
         }
     }

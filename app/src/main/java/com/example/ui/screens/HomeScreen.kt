@@ -96,6 +96,7 @@ import com.example.ui.components.GlowingActionButton
 import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.NeonBadge
 import com.example.ui.components.SwipeToDeleteContainer
+import com.example.ui.components.WindGlowAppNameBanner
 import com.example.ui.theme.BackgroundLight
 import com.example.ui.theme.CheckedGreen
 import com.example.ui.theme.CyanTintBg
@@ -436,60 +437,48 @@ private fun HomeHeader(
     isArabic: Boolean,
     onStartSupermarketMode: () -> Unit
 ) {
-    Row(
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+    val shopPillBg = if (isLight) MintTintBg else EmeraldSavings.copy(alpha = 0.2f)
+    val shopPillBorder = if (isLight) MintTintBorder else EmeraldSavings
+    val shopPillContent = if (isLight) MintTintText else EmeraldSavings
+
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Column {
-            Text(
-                text = if (isArabic) "شوبي بلس" else "Shopy Pulse",
-                color = TextPrimary,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = (-0.5).sp
-            )
-            Text(
-                text = if (isArabic) "مقارنة الأسعار الذكية وقائمة التسوق" else "Smart Price Comparison & Shopping",
-                color = TextSecondary,
-                fontSize = 12.sp
-            )
-        }
-
-        val isLight = MaterialTheme.colorScheme.background == BackgroundLight
-        val shopPillBg = if (isLight) MintTintBg else EmeraldSavings.copy(alpha = 0.2f)
-        val shopPillBorder = if (isLight) MintTintBorder else EmeraldSavings
-        val shopPillContent = if (isLight) MintTintText else EmeraldSavings
-
-        // Cart / Supermarket Mode Button
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(20.dp))
-                .background(shopPillBg)
-                .border(BorderStroke(1.dp, shopPillBorder), RoundedCornerShape(20.dp))
-                .clickable(onClick = onStartSupermarketMode)
-                .padding(horizontal = 14.dp, vertical = 8.dp)
-                .testTag("supermarket_mode_header_pill"),
-            contentAlignment = Alignment.Center
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.ShoppingCart,
-                    contentDescription = null,
-                    tint = shopPillContent,
-                    modifier = Modifier.size(17.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = if (isArabic) "السلة" else "Cart",
-                    color = shopPillContent,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                )
+        WindGlowAppNameBanner(
+            isArabic = isArabic,
+            trailingAction = {
+                // Cart / Supermarket Mode Button
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(shopPillBg)
+                        .border(BorderStroke(1.dp, shopPillBorder), RoundedCornerShape(18.dp))
+                        .clickable(onClick = onStartSupermarketMode)
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .testTag("supermarket_mode_header_pill"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.ShoppingCart,
+                            contentDescription = null,
+                            tint = shopPillContent,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = if (isArabic) "السلة" else "Cart",
+                            color = shopPillContent,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
-        }
+        )
     }
 }
 
@@ -779,7 +768,7 @@ fun ShoppingItemRow(
             .fillMaxWidth()
             .testTag("shopping_item_${item.id}"),
         backgroundColor = cardBackground,
-        glowColor = if (item.isChecked) null else if (item.barcode != null) ElectricCyan.copy(alpha = 0.3f) else null,
+        glowColor = if (item.isChecked) null else if (isLight) null else ElectricCyan.copy(alpha = 0.2f),
         onClick = onItemClick
     ) {
         Row(
@@ -860,15 +849,6 @@ fun ShoppingItemRow(
                         color = TextSecondary,
                         fontSize = 11.sp
                     )
-
-                    if (item.barcode != null) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        NeonBadge(
-                            text = if (isArabic) "باركود" else "BARCODE",
-                            accentColor = ElectricCyan,
-                            icon = Icons.Default.QrCodeScanner
-                        )
-                    }
 
                     if (item.estimatedPriceDzd > 0) {
                         Spacer(modifier = Modifier.width(8.dp))
@@ -1015,7 +995,6 @@ fun AddItemSheetContent(
     var manualCategory by remember { mutableStateOf("") }
     var manualQuantity by remember { mutableIntStateOf(1) }
     var manualUnit by remember { mutableStateOf("pcs") }
-    var manualBarcode by remember { mutableStateOf("") }
     var manualPrice by remember { mutableDoubleStateOf(0.0) }
 
     // Auto-group all catalog products using ProductGroupingUtil
@@ -1316,7 +1295,7 @@ fun AddItemSheetContent(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (isArabic) "أو إدخال منتج يدوي مخصص (سعر، كمية، باركود)" else "Or enter custom product (price, qty, barcode)",
+                            text = if (isArabic) "أو إدخال منتج يدوي مخصص (سعر، كمية)" else "Or enter custom product (price, quantity)",
                             color = TextPrimary,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold
@@ -1416,23 +1395,6 @@ fun AddItemSheetContent(
                         }
                     }
 
-                    // Barcode input with Quick Scan Trigger
-                    OutlinedTextField(
-                        value = manualBarcode,
-                        onValueChange = { manualBarcode = it },
-                        label = { Text(if (isArabic) "الرمز الشريطي / باركود (اختياري)" else "Barcode (Optional)") },
-                        singleLine = true,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("input_item_barcode"),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = ElectricCyan,
-                            unfocusedBorderColor = GlassBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        )
-                    )
-
                     // Submit Manual Item Button
                     GlowingActionButton(
                         text = if (isArabic) "إضافة إلى القائمة" else "Add to Shopping List",
@@ -1447,12 +1409,11 @@ fun AddItemSheetContent(
                                     finalCat,
                                     manualQuantity,
                                     manualUnit,
-                                    manualBarcode.ifBlank { null },
+                                    null,
                                     manualPrice
                                 )
                                 manualName = ""
                                 manualNameAr = ""
-                                manualBarcode = ""
                                 manualPrice = 0.0
                                 isManualEntryExpanded = false
                             }

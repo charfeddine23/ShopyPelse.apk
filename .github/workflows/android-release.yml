@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   build-and-release:
@@ -134,10 +135,10 @@ jobs:
             
             **Key Features Included:**
             - 🛒 Smart Shopping List with auto-categorization & offline Room DB
-            - 🔍 In-store Barcode & QR Code price verification scanner
-            - 📊 Total Basket multi-market price comparison
+            - 📊 Total Basket multi-market price comparison across stores
             - ⚡ Supermarket Mode with live budget HUD & real-time progress
             - ⚙️ Settings: Dark/Light Mode, Language switch (Arabic RTL / English LTR), Google Drive backup
+            - 🌬️ Animated Flowing Wind Glow Header for Shopy Pulse
             
             #### 📲 Installation & Update Instructions:
             1. Download the `ShopyPulse-v${{ env.VERSION_NAME }}.apk` file attached below.
@@ -148,3 +149,35 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prune Older Releases (Retain Only The Latest Release)
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Pruning older releases to keep only the latest release..."
+          CURRENT_TAG="${{ env.TAG_NAME }}"
+          OLD_RELEASES=$(gh release list --limit 100 --json tagName --jq '.[].tagName' | grep -v "^${CURRENT_TAG}$" || true)
+          for old_tag in $OLD_RELEASES; do
+            if [ -n "$old_tag" ]; then
+              echo "Deleting old release: $old_tag"
+              gh release delete "$old_tag" --cleanup-tag --yes || echo "Could not delete $old_tag, continuing..."
+            fi
+          done
+          echo "Old releases cleaned successfully. Only latest release ($CURRENT_TAG) retained."
+
+      - name: Prune Older Workflow Runs (Retain Only The Latest Action Runs)
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Pruning older completed workflow runs in Actions..."
+          CURRENT_RUN_ID="${{ github.run_id }}"
+          OLD_RUNS=$(gh run list --workflow=android-release.yml --status=completed --json databaseId --jq '.[].databaseId' | grep -v "^${CURRENT_RUN_ID}$" || true)
+          for run_id in $OLD_RUNS; do
+            if [ -n "$run_id" ]; then
+              echo "Deleting old workflow run: $run_id"
+              gh run delete "$run_id" || echo "Could not delete run $run_id, continuing..."
+            fi
+          done
+          echo "Workflow runs cleanup complete. Only latest run is preserved."

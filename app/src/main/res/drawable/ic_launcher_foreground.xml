@@ -1,8 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="66dp"
-        android:height="66dp"
-        android:drawable="@drawable/ic_shopy_pulse_foreground"
-        android:gravity="center" />
-</layer-list>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <group>
+        <!-- Shopping Bag Handle -->
+        <path
+            android:pathData="M44,40 L44,32 C44,26.48 48.48,22 54,22 C59.52,22 64,26.48 64,32 L64,40"
+            android:strokeWidth="4"
+            android:strokeColor="#00E5FF"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000" />
+
+        <!-- Shopping Bag Body Translucent Glass Fill -->
+        <path
+            android:pathData="M36,40 L72,40 C74.76,40 76.94,42.24 76.65,44.98 L73.15,75.98 C72.87,78.27 70.93,80 68.62,80 L39.38,80 C37.07,80 35.13,78.27 34.85,75.98 L31.35,44.98 C31.06,42.24 33.24,40 36,40 Z"
+            android:fillColor="#2200E5FF" />
+
+        <!-- Shopping Bag Outline -->
+        <path
+            android:pathData="M36,40 L72,40 C74.76,40 76.94,42.24 76.65,44.98 L73.15,75.98 C72.87,78.27 70.93,80 68.62,80 L39.38,80 C37.07,80 35.13,78.27 34.85,75.98 L31.35,44.98 C31.06,42.24 33.24,40 36,40 Z"
+            android:strokeWidth="3.5"
+            android:strokeColor="#00E5FF"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000" />
+
+        <!-- Pulse Waveform Subtle Glow Layer -->
+        <path
+            android:pathData="M26,61 L41,61 L46,51 L50.5,70 L55,48 L59,67 L63,61 L82,61"
+            android:strokeWidth="6"
+            android:strokeColor="#4000E676"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000" />
+
+        <!-- Neon Pulse Waveform (Sharp Foreground) -->
+        <path
+            android:pathData="M26,61 L41,61 L46,51 L50.5,70 L55,48 L59,67 L63,61 L82,61"
+            android:strokeWidth="3.6"
+            android:strokeColor="#00E676"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000" />
+
+        <!-- Peak Pulse Spark Dot -->
+        <path
+            android:pathData="M55,42 A2.5,2.5 0 1,1 55,41.99"
+            android:fillColor="#00E5FF" />
+    </group>
+</vector>
