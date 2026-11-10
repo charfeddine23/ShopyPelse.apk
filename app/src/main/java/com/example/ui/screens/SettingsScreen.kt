@@ -3,6 +3,11 @@ package com.example.ui.screens
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,7 +23,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -27,8 +32,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.CompareArrows
-import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudDone
@@ -37,12 +40,9 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCode
-import androidx.compose.material.icons.filled.QrCodeScanner
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Verified
@@ -52,7 +52,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,15 +65,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.Screen
 import com.example.ui.components.QrShareDialog
 import com.example.ui.theme.BackgroundLight
 import com.example.ui.theme.CyanTintBg
@@ -95,9 +91,9 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 
 /**
- * Production-ready Settings screen for 'Shopy Pulse'.
- * Follows Dark Slate aesthetic with Neumorphic & Soft Glass cards,
- * glowing neon borders, tactile feedback, and modular Compose architecture.
+ * Production-ready Settings Screen for 'Shopy Pulse' matching the Dark Slate
+ * Neumorphic & Soft Glass Engine design system with custom glowing switch toggles,
+ * section headers, and modular architecture.
  */
 @Composable
 fun SettingsScreen(
@@ -155,15 +151,15 @@ fun SettingsScreen(
         ) {
             // Screen Header & Back Button
             item {
-                SettingsHeader(
+                SettingsScreenHeader(
                     isArabic = isArabic,
                     onBack = onBack
                 )
             }
 
-            // Section 1: Header & Language Settings
+            // 1. Language Selection Section
             item {
-                LanguageSettingsCard(
+                LanguageSelectionSection(
                     isArabic = isArabic,
                     onLanguageSelect = { arabicSelected ->
                         viewModel.setLanguage(arabicSelected)
@@ -171,20 +167,20 @@ fun SettingsScreen(
                 )
             }
 
-            // Section 2: Theme Toggle Card (Night Mode & Day Mode)
+            // 2. Theme Mode Section (with Custom Glowing Switch Toggle)
             item {
-                ThemeToggleCard(
+                ThemeModeSection(
                     isDarkMode = isDarkMode,
                     isArabic = isArabic,
-                    onDarkModeSelect = { darkSelected ->
+                    onDarkModeChange = { darkSelected ->
                         viewModel.setDarkMode(darkSelected)
                     }
                 )
             }
 
-            // Section 3: QR Code Sync Section ("دون إنترنت", "مشاركة القائمة" vibrant green, "استيراد القائمة" cyan)
+            // 3. QR Code Offline Sync Section ("دون إنترنت" badge, dual glowing action buttons)
             item {
-                QrCodeSyncCard(
+                QrCodeOfflineSyncSection(
                     isArabic = isArabic,
                     onShareQr = {
                         qrDialogInitialMode = false
@@ -197,9 +193,9 @@ fun SettingsScreen(
                 )
             }
 
-            // Section 4: Google Drive Sync Section ("سحابي", last backup status, "Backup" & "Restore")
+            // 4. Google Drive Cloud Backup Section ("سحابي" badge, last backup, Backup & Restore)
             item {
-                GoogleDriveSyncCard(
+                GoogleDriveBackupSection(
                     isArabic = isArabic,
                     lastBackupDate = lastBackupDate,
                     onBackup = {
@@ -211,16 +207,16 @@ fun SettingsScreen(
                 )
             }
 
-            // Section 5: App & Developer Info Card
+            // 5. App & Developer Info Section ("Developed by Kahlessenane Charfeddine")
             item {
-                AppAndDeveloperInfoCard(
+                DeveloperInfoSection(
                     isArabic = isArabic
                 )
             }
 
-            // Bottom Spacing for Floating Navigation Bar
+            // Extra bottom spacing for Floating Bottom Navigation Bar
             item {
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(36.dp))
             }
         }
 
@@ -240,10 +236,10 @@ fun SettingsScreen(
 }
 
 /**
- * Top Screen Header with frosted circular back button
+ * Screen Top Header with Frosted Back Button
  */
 @Composable
-private fun SettingsHeader(
+private fun SettingsScreenHeader(
     isArabic: Boolean,
     onBack: () -> Unit
 ) {
@@ -294,25 +290,25 @@ private fun SettingsHeader(
 }
 
 /**
- * Section 1: Header & Language Settings
+ * 1. Language Selection Section
  */
 @Composable
-private fun LanguageSettingsCard(
+private fun LanguageSelectionSection(
     isArabic: Boolean,
     onLanguageSelect: (Boolean) -> Unit
 ) {
     Column {
-        SectionTitleHeader(
+        SectionHeader(
             icon = Icons.Default.Translate,
-            title = if (isArabic) "إعدادات اللغة" else "Language Settings",
+            title = if (isArabic) "إعدادات اللغة" else "Language Selection",
             accentColor = ElectricCyan
         )
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         NeumorphicGlassCard(
             modifier = Modifier.fillMaxWidth(),
-            glowColor = ElectricCyan.copy(alpha = 0.4f)
+            glowColor = ElectricCyan.copy(alpha = 0.45f)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
@@ -327,7 +323,7 @@ private fun LanguageSettingsCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    LanguageSelectionPill(
+                    LanguagePillCard(
                         title = "Arabic",
                         subtitle = "العربية",
                         isSelected = isArabic,
@@ -337,7 +333,7 @@ private fun LanguageSettingsCard(
                             .testTag("language_arabic")
                     )
 
-                    LanguageSelectionPill(
+                    LanguagePillCard(
                         title = "English",
                         subtitle = "الإنجليزية",
                         isSelected = !isArabic,
@@ -352,11 +348,8 @@ private fun LanguageSettingsCard(
     }
 }
 
-/**
- * Pill for selecting Language with active glowing neon border and checkmark
- */
 @Composable
-private fun LanguageSelectionPill(
+private fun LanguagePillCard(
     title: String,
     subtitle: String,
     isSelected: Boolean,
@@ -406,7 +399,7 @@ private fun LanguageSelectionPill(
                 )
                 Text(
                     text = subtitle,
-                    color = if (isSelected) titleColor.copy(alpha = 0.8f) else TextSecondary,
+                    color = if (isSelected) titleColor.copy(alpha = 0.85f) else TextSecondary,
                     fontSize = 11.sp
                 )
             }
@@ -424,28 +417,70 @@ private fun LanguageSelectionPill(
 }
 
 /**
- * Section 2: Theme Toggle Card (Options for Night Mode & Day Mode)
+ * 2. Theme Mode Section
+ * Includes custom glowing switch toggle for instant Night/Day mode switching
+ * along with dedicated selection cards.
  */
 @Composable
-private fun ThemeToggleCard(
+private fun ThemeModeSection(
     isDarkMode: Boolean,
     isArabic: Boolean,
-    onDarkModeSelect: (Boolean) -> Unit
+    onDarkModeChange: (Boolean) -> Unit
 ) {
     Column {
-        SectionTitleHeader(
+        SectionHeader(
             icon = if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
             title = "Theme",
             accentColor = NeonAmber
         )
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         NeumorphicGlassCard(
             modifier = Modifier.fillMaxWidth(),
-            glowColor = NeonAmber.copy(alpha = 0.35f)
+            glowColor = if (isDarkMode) ElectricCyan.copy(alpha = 0.35f) else NeonAmber.copy(alpha = 0.35f)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(18.dp)) {
+                // Interactive Row with description and Custom Glowing Switch Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (isDarkMode) {
+                                if (isArabic) "الوضع الليلي نشط" else "Night Mode Active"
+                            } else {
+                                if (isArabic) "الوضع النهاري نشط" else "Day Mode Active"
+                            },
+                            color = TextPrimary,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (isArabic) "تبديل المظهر بين الداكن والفاتح" else "Toggle between Dark and Light mode",
+                            color = TextSecondary,
+                            fontSize = 11.5.sp
+                        )
+                    }
+
+                    // Custom Switch Toggle with Glowing Active State
+                    NeumorphicGlowingSwitch(
+                        checked = isDarkMode,
+                        onCheckedChange = onDarkModeChange,
+                        activeColor = ElectricCyan,
+                        inactiveColor = NeonAmber,
+                        checkedIcon = Icons.Default.DarkMode,
+                        uncheckedIcon = Icons.Default.LightMode,
+                        modifier = Modifier.testTag("theme_switch_toggle")
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Dual Selection Option Cards (Night Mode & Day Mode)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -455,7 +490,7 @@ private fun ThemeToggleCard(
                         title = if (isArabic) "الوضع الليلي" else "Night Mode",
                         isSelected = isDarkMode,
                         accentColor = ElectricCyan,
-                        onClick = { onDarkModeSelect(true) },
+                        onClick = { onDarkModeChange(true) },
                         modifier = Modifier
                             .weight(1f)
                             .testTag("theme_night")
@@ -466,7 +501,7 @@ private fun ThemeToggleCard(
                         title = if (isArabic) "الوضع النهاري" else "Day Mode",
                         isSelected = !isDarkMode,
                         accentColor = NeonAmber,
-                        onClick = { onDarkModeSelect(false) },
+                        onClick = { onDarkModeChange(false) },
                         modifier = Modifier
                             .weight(1f)
                             .testTag("theme_day")
@@ -478,8 +513,85 @@ private fun ThemeToggleCard(
 }
 
 /**
- * Neumorphic Card for Night / Day Mode Toggle
+ * Custom Neumorphic Switch Toggle with Animated Glowing Active States
  */
+@Composable
+fun NeumorphicGlowingSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    activeColor: Color = ElectricCyan,
+    inactiveColor: Color = NeonAmber,
+    checkedIcon: ImageVector = Icons.Default.DarkMode,
+    uncheckedIcon: ImageVector = Icons.Default.LightMode
+) {
+    val trackWidth = 58.dp
+    val trackHeight = 32.dp
+    val thumbSize = 24.dp
+    val padding = 4.dp
+
+    val currentColor by animateColorAsState(
+        targetValue = if (checked) activeColor else inactiveColor,
+        animationSpec = tween(durationMillis = 300),
+        label = "switch_accent_color"
+    )
+
+    val thumbOffset by animateDpAsState(
+        targetValue = if (checked) trackWidth - thumbSize - padding else padding,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "switch_thumb_offset"
+    )
+
+    Box(
+        modifier = modifier
+            .size(width = trackWidth, height = trackHeight)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0x330B111E))
+            .border(
+                BorderStroke(
+                    1.2.dp,
+                    Brush.horizontalGradient(
+                        listOf(currentColor.copy(alpha = 0.7f), currentColor.copy(alpha = 0.25f))
+                    )
+                ),
+                RoundedCornerShape(16.dp)
+            )
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(bounded = true, color = currentColor),
+                onClick = { onCheckedChange(!checked) }
+            ),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        // Glowing halo behind thumb when active
+        Box(
+            modifier = Modifier
+                .offset(x = thumbOffset)
+                .size(thumbSize)
+                .shadow(
+                    elevation = 6.dp,
+                    shape = CircleShape,
+                    ambientColor = currentColor,
+                    spotColor = currentColor
+                )
+                .clip(CircleShape)
+                .background(currentColor)
+                .border(BorderStroke(1.5.dp, Color.White), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = if (checked) checkedIcon else uncheckedIcon,
+                contentDescription = null,
+                tint = if (checked) Color(0xFF071422) else Color(0xFF1E1405),
+                modifier = Modifier.size(14.dp)
+            )
+        }
+    }
+}
+
 @Composable
 private fun ThemeOptionCard(
     icon: ImageVector,
@@ -511,7 +623,7 @@ private fun ThemeOptionCard(
                 indication = ripple(bounded = true, color = accentColor),
                 onClick = onClick
             )
-            .padding(vertical = 14.dp, horizontal = 12.dp),
+            .padding(vertical = 12.dp, horizontal = 12.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(
@@ -536,31 +648,31 @@ private fun ThemeOptionCard(
 }
 
 /**
- * Section 3: QR Code Sync Section
+ * 3. QR Code Offline Sync Section
  * Features an offline badge ("دون إنترنت"), descriptive text,
  * and dual action buttons: "مشاركة القائمة" in vibrant green and "استيراد القائمة" in cyan.
  */
 @Composable
-private fun QrCodeSyncCard(
+private fun QrCodeOfflineSyncSection(
     isArabic: Boolean,
     onShareQr: () -> Unit,
     onImportQr: () -> Unit
 ) {
     Column {
-        SectionTitleHeader(
+        SectionHeader(
             icon = Icons.Default.QrCode,
             title = if (isArabic) "نقل ومشاركة القوائم عبر كود QR" else "QR Code List Transfer & Sync",
             accentColor = EmeraldSavings
         )
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         NeumorphicGlassCard(
             modifier = Modifier.fillMaxWidth(),
             glowColor = EmeraldSavings.copy(alpha = 0.45f)
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
-                // Header with Icon, Title and Offline Badge ("دون إنترنت")
+                // Header with QR Icon, Title and Offline Badge ("دون إنترنت")
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -601,7 +713,7 @@ private fun QrCodeSyncCard(
                         }
                     }
 
-                    // Offline Badge
+                    // Offline Badge Chip ("دون إنترنت")
                     NeonBadgeChip(
                         text = if (isArabic) "دون إنترنت" else "OFFLINE",
                         accentColor = EmeraldSavings
@@ -624,7 +736,7 @@ private fun QrCodeSyncCard(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Dual Action Buttons:
+                // Dual Glowing Action Buttons:
                 // Button 1: "مشاركة القائمة" in vibrant green
                 // Button 2: "استيراد القائمة" in cyan
                 Row(
@@ -723,24 +835,24 @@ private fun QrCodeSyncCard(
 }
 
 /**
- * Section 4: Google Drive Sync Section
+ * 4. Google Drive Cloud Backup Section
  * Features a cloud badge ("سحابي"), last backup status, and "Backup" / "Restore" buttons.
  */
 @Composable
-private fun GoogleDriveSyncCard(
+private fun GoogleDriveBackupSection(
     isArabic: Boolean,
     lastBackupDate: String,
     onBackup: () -> Unit,
     onRestore: () -> Unit
 ) {
     Column {
-        SectionTitleHeader(
+        SectionHeader(
             icon = Icons.Default.CloudDone,
             title = if (isArabic) "النسخ الاحتياطي في Google Drive" else "Google Drive Cloud Backup & Restore",
             accentColor = ElectricCyan
         )
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         NeumorphicGlassCard(
             modifier = Modifier.fillMaxWidth(),
@@ -797,7 +909,7 @@ private fun GoogleDriveSyncCard(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Last backup status
+                // Last Backup Status
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.DateRange,
@@ -899,23 +1011,23 @@ private fun GoogleDriveSyncCard(
 }
 
 /**
- * Section 5: App & Developer Info Card
- * Displays "Developed by Kahlessenane Charfeddine" with a verified badge,
+ * 5. App & Developer Info Section
+ * Displays "Developed by Kahlessenane Charfeddine" with verified badge,
  * app name "Shopy Pulse (شوبي بلس)", version (v1.0 Build 1), last update date,
  * and tech stack (Jetpack Compose • Room DB).
  */
 @Composable
-private fun AppAndDeveloperInfoCard(
+private fun DeveloperInfoSection(
     isArabic: Boolean
 ) {
     Column {
-        SectionTitleHeader(
+        SectionHeader(
             icon = Icons.Default.Info,
             title = if (isArabic) "معلومات التطبيق والمطور" else "App & Developer Info",
             accentColor = ElectricCyan
         )
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         NeumorphicGlassCard(
             modifier = Modifier.fillMaxWidth(),
@@ -983,7 +1095,7 @@ private fun AppAndDeveloperInfoCard(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // App Name
-                InfoRow(
+                InfoKeyValueRow(
                     label = if (isArabic) "اسم التطبيق" else "App Name",
                     value = "Shopy Pulse (شوبي بلس)"
                 )
@@ -991,7 +1103,7 @@ private fun AppAndDeveloperInfoCard(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Version Code
-                InfoRow(
+                InfoKeyValueRow(
                     label = if (isArabic) "رقم الإصدار" else "Version Code",
                     value = ShoppingViewModel.APP_VERSION
                 )
@@ -999,7 +1111,7 @@ private fun AppAndDeveloperInfoCard(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Last Update Date
-                InfoRow(
+                InfoKeyValueRow(
                     label = if (isArabic) "تاريخ آخر تحديث" else "Last Updated",
                     value = if (isArabic) ShoppingViewModel.LAST_UPDATE_DATE_AR else ShoppingViewModel.LAST_UPDATE_DATE_EN
                 )
@@ -1007,7 +1119,7 @@ private fun AppAndDeveloperInfoCard(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Tech Stack
-                InfoRow(
+                InfoKeyValueRow(
                     label = if (isArabic) "الواجهة والتقنيات" else "Tech Stack",
                     value = "Jetpack Compose • Room DB"
                 )
@@ -1017,7 +1129,7 @@ private fun AppAndDeveloperInfoCard(
 }
 
 /**
- * Standard Neumorphic & Soft Glass Card Container
+ * Standard Neumorphic & Soft Glass Card Container with glowing borders & elevation
  */
 @Composable
 private fun NeumorphicGlassCard(
@@ -1069,10 +1181,10 @@ private fun NeumorphicGlassCard(
 }
 
 /**
- * Section title header with glowing accent icon
+ * Section Header Component
  */
 @Composable
-private fun SectionTitleHeader(
+private fun SectionHeader(
     icon: ImageVector,
     title: String,
     accentColor: Color
@@ -1098,7 +1210,7 @@ private fun SectionTitleHeader(
 }
 
 /**
- * Neon Badge Chip
+ * Neon Badge Chip Component
  */
 @Composable
 private fun NeonBadgeChip(
@@ -1124,10 +1236,10 @@ private fun NeonBadgeChip(
 }
 
 /**
- * Key-Value Info Row with secondary label and primary value
+ * Key-Value Info Row Component
  */
 @Composable
-private fun InfoRow(
+private fun InfoKeyValueRow(
     label: String,
     value: String
 ) {
