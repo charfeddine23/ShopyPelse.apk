@@ -32,7 +32,7 @@ class ShoppingViewModel(
 ) : ViewModel() {
 
     companion object {
-        const val DEVELOPER_NAME = "Developed by Kahlessenane Charfeddine"
+        const val DEVELOPER_NAME = "Charfeddine Ka"
         const val APP_VERSION = "v1.0 Build 1"
         const val LAST_UPDATE_DATE_AR = "09/11/2026"
         const val LAST_UPDATE_DATE_EN = "09/11/2026"
@@ -97,6 +97,13 @@ class ShoppingViewModel(
 
     fun setSyncIntervalHours(hours: Int) {
         _syncIntervalHours.value = hours
+    }
+
+    private val _isDynamicGlowEnabled = MutableStateFlow(true)
+    val isDynamicGlowEnabled: StateFlow<Boolean> = _isDynamicGlowEnabled.asStateFlow()
+
+    fun setDynamicGlowEnabled(enabled: Boolean) {
+        _isDynamicGlowEnabled.value = enabled
     }
 
     val frequentPresets: List<ShoppingItem> = DatabaseInitialData.frequentPresets

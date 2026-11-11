@@ -141,6 +141,7 @@ fun HomeScreen(
     val isArabic by viewModel.isArabic.collectAsStateWithLifecycle()
     val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
     val basketSummaries by viewModel.basketSummaries.collectAsStateWithLifecycle()
+    val isDynamicGlowEnabled by viewModel.isDynamicGlowEnabled.collectAsStateWithLifecycle()
 
     var showAddDialog by remember { mutableStateOf(false) }
     var showFinishTripDialog by remember { mutableStateOf(false) }
@@ -172,6 +173,7 @@ fun HomeScreen(
             item {
                 HomeHeader(
                     isArabic = isArabic,
+                    isDynamicGlowEnabled = isDynamicGlowEnabled,
                     onStartSupermarketMode = onNavigateToSupermarketMode
                 )
             }
@@ -388,7 +390,7 @@ fun HomeScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .horizontalFadingEdge(fadeWidth = 16.dp)
+                                .horizontalFadingEdge(fadeWidth = 24.dp)
                                 .horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
@@ -437,6 +439,7 @@ fun HomeScreen(
 @Composable
 private fun HomeHeader(
     isArabic: Boolean,
+    isDynamicGlowEnabled: Boolean,
     onStartSupermarketMode: () -> Unit
 ) {
     val isLight = MaterialTheme.colorScheme.background == BackgroundLight
@@ -451,6 +454,7 @@ private fun HomeHeader(
     ) {
         WindGlowAppNameBanner(
             isArabic = isArabic,
+            isGlowEnabled = isDynamicGlowEnabled,
             trailingAction = {
                 // Cart / Supermarket Mode Button
                 Box(
@@ -617,7 +621,7 @@ private fun FrequentItemsSection(
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalFadingEdge(fadeWidth = 20.dp),
+                .horizontalFadingEdge(fadeWidth = 26.dp),
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -684,7 +688,7 @@ private fun CategoryChipsSection(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .horizontalFadingEdge(fadeWidth = 20.dp)
+            .horizontalFadingEdge(fadeWidth = 26.dp)
             .horizontalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)

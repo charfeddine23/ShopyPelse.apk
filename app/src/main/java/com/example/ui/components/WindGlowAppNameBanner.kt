@@ -66,6 +66,7 @@ import kotlin.math.sin
 fun WindGlowAppNameBanner(
     isArabic: Boolean,
     modifier: Modifier = Modifier,
+    isGlowEnabled: Boolean = true,
     trailingAction: (@Composable () -> Unit)? = null
 ) {
     val isLight = MaterialTheme.colorScheme.background == BackgroundLight
@@ -117,13 +118,14 @@ fun WindGlowAppNameBanner(
             .fillMaxWidth()
             .testTag("wind_glow_app_banner")
     ) {
-        // LAYER 1: STRICTLY BEHIND - Ambient glowing wind effect with soft edge fade (NO solid border)
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(86.dp)
-                .align(Alignment.Center)
-        ) {
+        if (isGlowEnabled) {
+            // LAYER 1: STRICTLY BEHIND - Ambient glowing wind effect with soft edge fade (NO solid border)
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(86.dp)
+                    .align(Alignment.Center)
+            ) {
             val w = size.width
             val h = size.height
 
@@ -225,6 +227,7 @@ fun WindGlowAppNameBanner(
                     center = Offset(sparkX, sparkY)
                 )
             }
+        }
         }
 
         // LAYER 2: FOREGROUND CARD CONTAINER - Sits strictly in front of the glow layer

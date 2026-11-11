@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudDone
@@ -114,6 +115,7 @@ fun SettingsScreen(
     val isArabic by viewModel.isArabic.collectAsStateWithLifecycle()
     val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
     val lastBackupDate by viewModel.lastBackupDate.collectAsStateWithLifecycle()
+    val isDynamicGlowEnabled by viewModel.isDynamicGlowEnabled.collectAsStateWithLifecycle()
 
     var showQrDialog by remember { mutableStateOf(false) }
     var qrDialogInitialMode by remember { mutableStateOf(false) }
@@ -193,6 +195,17 @@ fun SettingsScreen(
                     },
                     onSwitchPositionChanged = { center ->
                         switchCenterOffset = center
+                    }
+                )
+            }
+
+            // 2b. Dynamic App Title Glow Effect Toggle
+            item {
+                DynamicGlowToggleSection(
+                    isEnabled = isDynamicGlowEnabled,
+                    isArabic = isArabic,
+                    onToggleChange = { enabled ->
+                        viewModel.setDynamicGlowEnabled(enabled)
                     }
                 )
             }
@@ -282,28 +295,20 @@ fun SettingsScreen(
 private fun SettingsScreenHeader(
     isArabic: Boolean
 ) {
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 4.dp, bottom = 8.dp)
+            .padding(top = 4.dp, bottom = 4.dp)
     ) {
         Text(
             text = if (isArabic) "الإعدادات" else "Settings",
             color = TextPrimary,
-            fontSize = 26.sp,
+            fontSize = 20.sp,
             fontWeight = FontWeight.ExtraBold,
-            letterSpacing = (-0.5).sp,
+            letterSpacing = (-0.3).sp,
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Clip
-        )
-        Spacer(modifier = Modifier.height(3.dp))
-        Text(
-            text = if (isArabic) "تخصيص التطبيق، مزامنة ونقل البيانات" else "Preferences, data sync & app settings",
-            color = TextSecondary,
-            fontSize = 12.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -415,7 +420,7 @@ private fun CompactLanguagePill(
 /**
  * 2. Theme Mode Section
  * Includes custom glowing switch toggle for instant Night/Day mode switching
- * along with dedicated selection cards.
+ * in a compact container.
  */
 @Composable
 private fun ThemeModeSection(
@@ -427,7 +432,7 @@ private fun ThemeModeSection(
     Column {
         SectionHeader(
             icon = if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
-            title = "Theme",
+            title = if (isArabic) "المظهر والسمات" else "Theme & Mode",
             accentColor = NeonAmber
         )
 
@@ -435,47 +440,124 @@ private fun ThemeModeSection(
 
         NeumorphicGlassCard(
             modifier = Modifier.fillMaxWidth(),
-            glowColor = if (isDarkMode) ElectricCyan.copy(alpha = 0.35f) else NeonAmber.copy(alpha = 0.35f)
+            glowColor = if (isDarkMode) ElectricCyan.copy(alpha = 0.30f) else NeonAmber.copy(alpha = 0.30f)
         ) {
-            Column(modifier = Modifier.padding(18.dp)) {
-                // Interactive Row with description and Custom Glowing Switch Toggle
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 11.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = if (isDarkMode) {
-                                if (isArabic) "الوضع الليلي نشط" else "Night Mode Active"
-                            } else {
-                                if (isArabic) "الوضع النهاري نشط" else "Day Mode Active"
-                            },
-                            color = TextPrimary,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = if (isArabic) "تبديل المظهر بين الداكن والفاتح" else "Toggle between Dark and Light mode",
-                            color = TextSecondary,
-                            fontSize = 11.5.sp
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(9.dp))
+                            .background(if (isDarkMode) ElectricCyan.copy(alpha = 0.15f) else NeonAmber.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
+                            contentDescription = null,
+                            tint = if (isDarkMode) ElectricCyan else NeonAmber,
+                            modifier = Modifier.size(17.dp)
                         )
                     }
 
-                    // Custom Switch Toggle with Glowing Active State
-                    NeumorphicGlowingSwitch(
-                        checked = isDarkMode,
-                        onCheckedChange = onDarkModeChange,
-                        activeColor = ElectricCyan,
-                        inactiveColor = NeonAmber,
-                        checkedIcon = Icons.Default.DarkMode,
-                        uncheckedIcon = Icons.Default.LightMode,
-                        onPositionChanged = onSwitchPositionChanged,
-                        modifier = Modifier.testTag("theme_switch_toggle")
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    Text(
+                        text = if (isDarkMode) {
+                            if (isArabic) "الوضع الليلي" else "Night Mode"
+                        } else {
+                            if (isArabic) "الوضع النهاري" else "Day Mode"
+                        },
+                        color = TextPrimary,
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
+
+                // Custom Switch Toggle with Glowing Active State
+                NeumorphicGlowingSwitch(
+                    checked = isDarkMode,
+                    onCheckedChange = onDarkModeChange,
+                    activeColor = ElectricCyan,
+                    inactiveColor = NeonAmber,
+                    checkedIcon = Icons.Default.DarkMode,
+                    uncheckedIcon = Icons.Default.LightMode,
+                    onPositionChanged = onSwitchPositionChanged,
+                    modifier = Modifier.testTag("theme_switch_toggle")
+                )
             }
+        }
+    }
+}
+
+/**
+ * 2b. Dynamic App Title Wind Glow Effect Toggle Section
+ */
+@Composable
+private fun DynamicGlowToggleSection(
+    isEnabled: Boolean,
+    isArabic: Boolean,
+    onToggleChange: (Boolean) -> Unit
+) {
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+
+    NeumorphicGlassCard(
+        modifier = Modifier.fillMaxWidth(),
+        glowColor = if (isEnabled) ElectricCyan.copy(alpha = 0.30f) else Color.Transparent
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 11.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(if (isEnabled) ElectricCyan.copy(alpha = 0.15f) else Color(0x18777777)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        tint = if (isEnabled) ElectricCyan else TextSecondary,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Text(
+                    text = if (isArabic) "التأثير الحركي لاسم التطبيق" else "App Title Dynamic Glow",
+                    color = TextPrimary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            NeumorphicGlowingSwitch(
+                checked = isEnabled,
+                onCheckedChange = onToggleChange,
+                activeColor = ElectricCyan,
+                inactiveColor = if (isLight) Color(0xFFCBD5E1) else Color(0xFF475569),
+                checkedIcon = Icons.Default.AutoAwesome,
+                uncheckedIcon = Icons.Default.AutoAwesome,
+                modifier = Modifier.testTag("dynamic_glow_switch")
+            )
         }
     }
 }
@@ -578,23 +660,13 @@ private fun QrCodeOfflineSyncSection(
     isArabic: Boolean,
     onOpenTransfer: () -> Unit
 ) {
-    Column {
-        SectionHeader(
-            icon = Icons.Default.QrCode,
-            title = if (isArabic) "نقل ومشاركة القوائم عبر كود QR" else "QR Code List Transfer & Sync",
-            accentColor = EmeraldSavings
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        SingleActionNavButton(
-            icon = Icons.Default.QrCode,
-            title = if (isArabic) "نقل ومشاركة القوائم (QR Code)" else "Transfer & Share Lists via QR",
-            accentColor = EmeraldSavings,
-            onClick = onOpenTransfer,
-            testTag = "open_qr_transfer_button"
-        )
-    }
+    SingleActionNavButton(
+        icon = Icons.Default.QrCode,
+        title = if (isArabic) "نقل ومشاركة القوائم (QR Code)" else "Transfer & Share Lists via QR",
+        accentColor = EmeraldSavings,
+        onClick = onOpenTransfer,
+        testTag = "open_qr_transfer_button"
+    )
 }
 
 /**
@@ -606,23 +678,13 @@ private fun GoogleDriveBackupSection(
     isArabic: Boolean,
     onOpenDrive: () -> Unit
 ) {
-    Column {
-        SectionHeader(
-            icon = Icons.Default.CloudDone,
-            title = if (isArabic) "النسخ الاحتياطي في Google Drive" else "Google Drive Cloud Backup & Restore",
-            accentColor = ElectricCyan
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        SingleActionNavButton(
-            icon = Icons.Default.CloudDone,
-            title = if (isArabic) "النسخ الاحتياطي والاستعادة (Google Drive)" else "Google Drive Backup & Restore",
-            accentColor = ElectricCyan,
-            onClick = onOpenDrive,
-            testTag = "open_google_drive_button"
-        )
-    }
+    SingleActionNavButton(
+        icon = Icons.Default.CloudDone,
+        title = if (isArabic) "النسخ الاحتياطي والاستعادة (Google Drive)" else "Google Drive Backup & Restore",
+        accentColor = ElectricCyan,
+        onClick = onOpenDrive,
+        testTag = "open_google_drive_button"
+    )
 }
 
 /**

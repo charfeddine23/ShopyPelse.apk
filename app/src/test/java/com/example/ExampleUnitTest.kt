@@ -46,7 +46,7 @@ class ExampleUnitTest {
 
     @Test
     fun testDeveloperAndAppInfo() {
-        assertEquals("Developed by Kahlessenane Charfeddine", com.example.ui.viewmodel.ShoppingViewModel.DEVELOPER_NAME)
+        assertEquals("Charfeddine Ka", com.example.ui.viewmodel.ShoppingViewModel.DEVELOPER_NAME)
         assertEquals("v1.0 Build 1", com.example.ui.viewmodel.ShoppingViewModel.APP_VERSION)
     }
 }

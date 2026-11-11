@@ -469,7 +469,7 @@ fun PriceComparisonScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .horizontalFadingEdge(fadeWidth = 20.dp)
+                            .horizontalFadingEdge(fadeWidth = 26.dp)
                     ) {
                         items(LocalizationUtil.allCategories.size) { idx ->
                             val cat = LocalizationUtil.allCategories[idx]
