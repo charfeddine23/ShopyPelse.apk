@@ -16,13 +16,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -31,11 +29,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -54,7 +50,6 @@ import com.example.ui.theme.CyanTintBg
 import com.example.ui.theme.CyanTintBorder
 import com.example.ui.theme.ElectricCyan
 import com.example.ui.theme.EmeraldSavings
-import com.example.ui.theme.MintTintBorder
 import com.example.ui.theme.NeonAmber
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
@@ -63,9 +58,9 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Animated glowing wind background and banner for the app name ("Shopy Pulse" / "شوبي بلس").
- * Features ethereal, multi-colored wind streams, pulsating radial glow, and drifting light wisps
- * designed for silky 60fps animations in both Dark and Light modes.
+ * Top App Bar component for 'Shopy Pulse' featuring an ambient glowing wind effect layer
+ * positioned strictly behind the card container, with smooth edge fade gradients on all sides
+ * and 100% crisp foreground typography and iconography.
  */
 @Composable
 fun WindGlowAppNameBanner(
@@ -75,7 +70,7 @@ fun WindGlowAppNameBanner(
 ) {
     val isLight = MaterialTheme.colorScheme.background == BackgroundLight
 
-    // Infinite transitions driving hyper-smooth wind currents and breathing aura
+    // Infinite transitions for silky 60fps wind currents and breathing aura
     val infiniteTransition = rememberInfiniteTransition(label = "wind_glow_transition")
 
     // 1. Horizontal wind drift phase (0..1)
@@ -111,55 +106,41 @@ fun WindGlowAppNameBanner(
         label = "breeze_sway"
     )
 
-    // Palette tokens for the wind currents
+    // Palette tokens for ambient glow
     val cyanWindColor = if (isLight) Color(0xFF06B6D4) else ElectricCyan
     val emeraldWindColor = if (isLight) Color(0xFF10B981) else EmeraldSavings
     val violetWindColor = if (isLight) Color(0xFF8B5CF6) else Color(0xFFA78BFA)
     val amberWindColor = if (isLight) Color(0xFFF59E0B) else NeonAmber
 
-    val containerBg = if (isLight) {
-        Color(0xE6FFFFFF)
-    } else {
-        Color(0xD90E1726)
-    }
-
-    val containerBorder = if (isLight) {
-        BorderStroke(1.2.dp, CyanTintBorder.copy(alpha = 0.55f))
-    } else {
-        BorderStroke(1.2.dp, ElectricCyan.copy(alpha = 0.35f * glowPulse))
-    }
-
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .background(containerBg)
-            .border(containerBorder, RoundedCornerShape(22.dp))
             .testTag("wind_glow_app_banner")
     ) {
-        // Glowing Wind Streams Canvas (Behind the text)
+        // LAYER 1: STRICTLY BEHIND - Ambient glowing wind effect with soft edge fade (NO solid border)
         Canvas(
             modifier = Modifier
-                .matchParentSize()
-                .clip(RoundedCornerShape(22.dp))
+                .fillMaxWidth()
+                .height(86.dp)
+                .align(Alignment.Center)
         ) {
             val w = size.width
             val h = size.height
 
-            // 1. Ambient Central Wind Aurora Bloom
-            val bloomCenter = Offset(w * 0.35f, h * 0.5f)
-            val bloomRadius = w * 0.75f
+            // 1. Soft radial bloom centered behind title with full alpha fade on all edges
+            val bloomCenter = Offset(if (isArabic) w * 0.68f else w * 0.32f, h * 0.5f)
+            val bloomRadius = w * 0.65f
             val bloomColors = if (isLight) {
                 listOf(
-                    cyanWindColor.copy(alpha = 0.16f * glowPulse),
-                    emeraldWindColor.copy(alpha = 0.12f * glowPulse),
+                    cyanWindColor.copy(alpha = 0.22f * glowPulse),
+                    emeraldWindColor.copy(alpha = 0.15f * glowPulse),
                     violetWindColor.copy(alpha = 0.08f * glowPulse),
                     Color.Transparent
                 )
             } else {
                 listOf(
-                    cyanWindColor.copy(alpha = 0.28f * glowPulse),
-                    emeraldWindColor.copy(alpha = 0.20f * glowPulse),
+                    cyanWindColor.copy(alpha = 0.32f * glowPulse),
+                    emeraldWindColor.copy(alpha = 0.22f * glowPulse),
                     violetWindColor.copy(alpha = 0.14f * glowPulse),
                     Color.Transparent
                 )
@@ -178,208 +159,196 @@ fun WindGlowAppNameBanner(
             val dir = if (isArabic) -1f else 1f
             val basePhase = windProgress * 2.0 * PI * dir
 
-            // 2. Wind Stream Ribbon 1 (Top Cyan Flow)
+            // 2. Wind Stream Ribbon 1 (Top Cyan Flow with 4-way soft alpha fade)
             val path1 = Path()
-            val steps = 24
+            val steps = 30
             val dx = w / steps
             for (i in 0..steps) {
                 val x = i * dx
                 val normX = (x / w).toDouble()
                 val wave = sin(normX * 2.2 * PI + basePhase) * (6f * breezeSway) +
                         cos(normX * 1.5 * PI + basePhase * 0.5) * 3f
-                val y = (h * 0.28f + wave).toFloat()
+                val y = (h * 0.30f + wave).toFloat()
                 if (i == 0) path1.moveTo(x, y) else path1.lineTo(x, y)
             }
             drawPath(
                 path = path1,
                 brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        Color.Transparent,
-                        cyanWindColor.copy(alpha = 0.45f * glowPulse),
-                        emeraldWindColor.copy(alpha = 0.50f * glowPulse),
-                        violetWindColor.copy(alpha = 0.35f * glowPulse),
-                        Color.Transparent
-                    )
+                    0.00f to Color.Transparent,
+                    0.15f to cyanWindColor.copy(alpha = 0.40f * glowPulse),
+                    0.50f to emeraldWindColor.copy(alpha = 0.45f * glowPulse),
+                    0.85f to violetWindColor.copy(alpha = 0.30f * glowPulse),
+                    1.00f to Color.Transparent
                 ),
                 style = Stroke(width = 3.2.dp.toPx(), cap = StrokeCap.Round)
             )
 
-            // 3. Wind Stream Ribbon 2 (Main Center-Bottom Emerald & Cyan Current)
+            // 3. Wind Stream Ribbon 2 (Main Lower Stream with soft alpha fade)
             val path2 = Path()
             for (i in 0..steps) {
                 val x = i * dx
                 val normX = (x / w).toDouble()
-                val wave = sin(normX * 2.8 * PI - basePhase * 1.2) * 8f +
+                val wave = sin(normX * 2.8 * PI - basePhase * 1.2) * 7f +
                         cos(normX * 1.8 * PI + basePhase) * (4f * breezeSway)
-                val y = (h * 0.68f + wave).toFloat()
+                val y = (h * 0.70f + wave).toFloat()
                 if (i == 0) path2.moveTo(x, y) else path2.lineTo(x, y)
             }
             drawPath(
                 path = path2,
                 brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        Color.Transparent,
-                        violetWindColor.copy(alpha = 0.30f * glowPulse),
-                        emeraldWindColor.copy(alpha = 0.55f * glowPulse),
-                        cyanWindColor.copy(alpha = 0.45f * glowPulse),
-                        Color.Transparent
-                    )
+                    0.00f to Color.Transparent,
+                    0.18f to violetWindColor.copy(alpha = 0.28f * glowPulse),
+                    0.55f to emeraldWindColor.copy(alpha = 0.50f * glowPulse),
+                    0.82f to cyanWindColor.copy(alpha = 0.40f * glowPulse),
+                    1.00f to Color.Transparent
                 ),
-                style = Stroke(width = 4.0.dp.toPx(), cap = StrokeCap.Round)
+                style = Stroke(width = 3.6.dp.toPx(), cap = StrokeCap.Round)
             )
 
-            // 4. Wind Stream Ribbon 3 (Lower Ethereal Amber/Mint Breeze)
-            val path3 = Path()
-            for (i in 0..steps) {
-                val x = i * dx
-                val normX = (x / w).toDouble()
-                val wave = cos(normX * 3.2 * PI + basePhase * 1.5) * 5f
-                val y = (h * 0.88f + wave).toFloat()
-                if (i == 0) path3.moveTo(x, y) else path3.lineTo(x, y)
-            }
-            drawPath(
-                path = path3,
-                brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        Color.Transparent,
-                        amberWindColor.copy(alpha = 0.25f * glowPulse),
-                        emeraldWindColor.copy(alpha = 0.35f * glowPulse),
-                        Color.Transparent
-                    )
-                ),
-                style = Stroke(width = 2.0.dp.toPx(), cap = StrokeCap.Round)
-            )
-
-            // 5. Drifting Wind Spark Wisps (Floating glowing specks riding the wind)
-            val sparkOffsets = listOf(0.12f, 0.34f, 0.58f, 0.76f, 0.92f)
+            // 4. Drifting glowing wind sparks along the wind
+            val sparkOffsets = listOf(0.15f, 0.35f, 0.60f, 0.82f)
             for ((idx, offsetRatio) in sparkOffsets.withIndex()) {
                 val sparkX = ((offsetRatio + windProgress * dir) % 1.0f).let { if (it < 0) it + 1f else it } * w
                 val sparkNorm = (sparkX / w).toDouble()
-                val sparkY = (h * (0.35f + 0.35f * sin(sparkNorm * 3 * PI + idx).toFloat())).coerceIn(12f, h - 12f)
+                val edgeAlpha = (sin(sparkNorm * PI)).toFloat().coerceIn(0f, 1f)
+                val sparkY = (h * (0.35f + 0.30f * sin(sparkNorm * 3 * PI + idx).toFloat())).coerceIn(10f, h - 10f)
                 val sparkColor = if (idx % 2 == 0) cyanWindColor else emeraldWindColor
 
-                // Soft outer glow of spark
                 drawCircle(
-                    color = sparkColor.copy(alpha = 0.30f * glowPulse),
+                    color = sparkColor.copy(alpha = 0.25f * glowPulse * edgeAlpha),
                     radius = 5.dp.toPx(),
                     center = Offset(sparkX, sparkY)
                 )
-                // Sharp center dot
                 drawCircle(
-                    color = sparkColor.copy(alpha = 0.85f * glowPulse),
-                    radius = 2.2.dp.toPx(),
+                    color = sparkColor.copy(alpha = 0.80f * glowPulse * edgeAlpha),
+                    radius = 2.dp.toPx(),
                     center = Offset(sparkX, sparkY)
                 )
             }
         }
 
-        // Content Row: App Emblem + Glowing App Name + Subtitle + Trailing Action
-        Row(
+        // LAYER 2: FOREGROUND CARD CONTAINER - Sits strictly in front of the glow layer
+        // Protected by modern soft-glass surface so title, icons, and text are crisp and unaffected by color blending
+        val cardBg = if (isLight) {
+            Color(0xF0FFFFFF)
+        } else {
+            Color(0xE6101726)
+        }
+        val cardBorder = if (isLight) {
+            BorderStroke(1.dp, CyanTintBorder.copy(alpha = 0.35f))
+        } else {
+            BorderStroke(1.dp, Color(0x3338BDF8))
+        }
+
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .clip(RoundedCornerShape(20.dp))
+                .background(cardBg)
+                .border(cardBorder, RoundedCornerShape(20.dp))
+                .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Glowing App Emblem Icon Container with pulsating neon border
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(
-                            if (isLight) CyanTintBg else Color(0x3300E5FF)
-                        )
-                        .border(
-                            BorderStroke(
-                                1.5.dp,
-                                if (isLight) CyanTintBorder else ElectricCyan.copy(alpha = 0.6f * glowPulse)
-                            ),
-                            RoundedCornerShape(14.dp)
-                        ),
-                    contentAlignment = Alignment.Center
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_shopy_pulse_logo),
-                        contentDescription = "Shopy Pulse Logo",
-                        tint = Color.Unspecified,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
+                    // App Emblem Icon Container (Crisp & Sharp)
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(13.dp))
+                            .background(
+                                if (isLight) CyanTintBg else Color(0x3300E5FF)
+                            )
+                            .border(
+                                BorderStroke(
+                                    1.2.dp,
+                                    if (isLight) CyanTintBorder else ElectricCyan.copy(alpha = 0.6f)
+                                ),
+                                RoundedCornerShape(13.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_shopy_pulse_logo),
+                            contentDescription = "Shopy Pulse Logo",
+                            tint = Color.Unspecified,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
 
-                // App Name and Tagline
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    // App Title & Tagline (100% Crisp, completely unaffected by glow blending)
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = if (isArabic) "شوبي بلس" else "Shopy Pulse",
+                                color = TextPrimary,
+                                fontSize = 21.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = (-0.4).sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            // Pulse Status Badge
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (isLight) Color(0xFFE0F2FE) else ElectricCyan.copy(alpha = 0.16f)
+                                    )
+                                    .border(
+                                        BorderStroke(
+                                            1.dp,
+                                            if (isLight) Color(0xFF38BDF8) else ElectricCyan.copy(alpha = 0.45f)
+                                        ),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.AutoAwesome,
+                                        contentDescription = null,
+                                        tint = if (isLight) Color(0xFF0284C7) else ElectricCyan,
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = if (isArabic) "نبض ذكي" else "PULSE",
+                                        color = if (isLight) Color(0xFF0284C7) else ElectricCyan,
+                                        fontSize = 9.5.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
                         Text(
-                            text = if (isArabic) "شوبي بلس" else "Shopy Pulse",
-                            color = TextPrimary,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = (-0.4).sp,
+                            text = if (isArabic) "مقارنة الأسعار الذكية وقائمة التسوق" else "Smart Price Comparison & Shopping",
+                            color = TextSecondary,
+                            fontSize = 11.5.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        // Dynamic Wind Glow Badge
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (isLight) {
-                                        Color(0xFFE0F2FE)
-                                    } else {
-                                        ElectricCyan.copy(alpha = 0.18f * glowPulse)
-                                    }
-                                )
-                                .border(
-                                    BorderStroke(
-                                        1.dp,
-                                        if (isLight) Color(0xFF38BDF8) else ElectricCyan.copy(alpha = 0.5f * glowPulse)
-                                    ),
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.AutoAwesome,
-                                    contentDescription = null,
-                                    tint = if (isLight) Color(0xFF0284C7) else ElectricCyan,
-                                    modifier = Modifier.size(11.dp)
-                                )
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Text(
-                                    text = if (isArabic) "نبض ذكي" else "PULSE",
-                                    color = if (isLight) Color(0xFF0284C7) else ElectricCyan,
-                                    fontSize = 9.5.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
                     }
-
-                    Spacer(modifier = Modifier.height(2.dp))
-
-                    Text(
-                        text = if (isArabic) "مقارنة الأسعار الذكية وقائمة التسوق" else "Smart Price Comparison & Shopping",
-                        color = TextSecondary,
-                        fontSize = 11.5.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
                 }
-            }
 
-            if (trailingAction != null) {
-                Spacer(modifier = Modifier.width(8.dp))
-                trailingAction()
+                if (trailingAction != null) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    trailingAction()
+                }
             }
         }
     }

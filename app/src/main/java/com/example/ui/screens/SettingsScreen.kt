@@ -70,7 +70,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.ui.components.CircularRevealThemeOverlay
 import com.example.ui.components.QrShareDialog
 import com.example.ui.theme.BackgroundLight
 import com.example.ui.theme.CyanTintBg
@@ -109,6 +113,10 @@ fun SettingsScreen(
 
     var showQrDialog by remember { mutableStateOf(false) }
     var qrDialogInitialMode by remember { mutableStateOf(false) }
+
+    // Circular Reveal animation states for Light/Dark mode transition
+    var revealTargetDark by remember { mutableStateOf<Boolean?>(null) }
+    var switchCenterOffset by remember { mutableStateOf(Offset.Zero) }
 
     // Storage Access Framework Launcher to save backup file (Google Drive / local)
     val createDocLauncher = rememberLauncherForActivityResult(
@@ -173,7 +181,14 @@ fun SettingsScreen(
                     isDarkMode = isDarkMode,
                     isArabic = isArabic,
                     onDarkModeChange = { darkSelected ->
-                        viewModel.setDarkMode(darkSelected)
+                        if (revealTargetDark == null && darkSelected != isDarkMode) {
+                            revealTargetDark = darkSelected
+                        } else if (revealTargetDark == null) {
+                            viewModel.setDarkMode(darkSelected)
+                        }
+                    },
+                    onSwitchPositionChanged = { center ->
+                        switchCenterOffset = center
                     }
                 )
             }
@@ -229,6 +244,20 @@ fun SettingsScreen(
                 onDismiss = { showQrDialog = false },
                 onImportPayload = { payload ->
                     viewModel.importListFromQr(payload)
+                }
+            )
+        }
+
+        // Circular Reveal Transition Animation Overlay for Light/Dark Mode Switch
+        if (revealTargetDark != null) {
+            CircularRevealThemeOverlay(
+                isTargetDark = revealTargetDark!!,
+                center = switchCenterOffset,
+                onMiddlePoint = {
+                    viewModel.setDarkMode(revealTargetDark!!)
+                },
+                onAnimationEnd = {
+                    revealTargetDark = null
                 }
             )
         }
@@ -428,7 +457,8 @@ private fun LanguagePillCard(
 private fun ThemeModeSection(
     isDarkMode: Boolean,
     isArabic: Boolean,
-    onDarkModeChange: (Boolean) -> Unit
+    onDarkModeChange: (Boolean) -> Unit,
+    onSwitchPositionChanged: (Offset) -> Unit = {}
 ) {
     Column {
         SectionHeader(
@@ -477,6 +507,7 @@ private fun ThemeModeSection(
                         inactiveColor = NeonAmber,
                         checkedIcon = Icons.Default.DarkMode,
                         uncheckedIcon = Icons.Default.LightMode,
+                        onPositionChanged = onSwitchPositionChanged,
                         modifier = Modifier.testTag("theme_switch_toggle")
                     )
                 }
@@ -496,7 +527,8 @@ fun NeumorphicGlowingSwitch(
     activeColor: Color = ElectricCyan,
     inactiveColor: Color = NeonAmber,
     checkedIcon: ImageVector = Icons.Default.DarkMode,
-    uncheckedIcon: ImageVector = Icons.Default.LightMode
+    uncheckedIcon: ImageVector = Icons.Default.LightMode,
+    onPositionChanged: (Offset) -> Unit = {}
 ) {
     val trackWidth = 58.dp
     val trackHeight = 32.dp
@@ -520,6 +552,14 @@ fun NeumorphicGlowingSwitch(
 
     Box(
         modifier = modifier
+            .onGloballyPositioned { coordinates ->
+                val pos = coordinates.positionInWindow()
+                val center = Offset(
+                    pos.x + coordinates.size.width / 2f,
+                    pos.y + coordinates.size.height / 2f
+                )
+                onPositionChanged(center)
+            }
             .size(width = trackWidth, height = trackHeight)
             .clip(RoundedCornerShape(16.dp))
             .background(Color(0x330B111E))
