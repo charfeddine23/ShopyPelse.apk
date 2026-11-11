@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudDone
@@ -46,10 +47,12 @@ import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -67,6 +70,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -102,7 +106,7 @@ import java.io.InputStreamReader
 @Composable
 fun SettingsScreen(
     viewModel: ShoppingViewModel,
-    onBack: () -> Unit,
+    onBack: () -> Unit = {},
     onOpenQrShare: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -113,6 +117,7 @@ fun SettingsScreen(
 
     var showQrDialog by remember { mutableStateOf(false) }
     var qrDialogInitialMode by remember { mutableStateOf(false) }
+    var showDriveDialog by remember { mutableStateOf(false) }
 
     // Circular Reveal animation states for Light/Dark mode transition
     var revealTargetDark by remember { mutableStateOf<Boolean?>(null) }
@@ -157,15 +162,14 @@ fun SettingsScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Screen Header & Back Button
+            // Screen Header (without back arrow, title strictly on one line)
             item {
                 SettingsScreenHeader(
-                    isArabic = isArabic,
-                    onBack = onBack
+                    isArabic = isArabic
                 )
             }
 
-            // 1. Language Selection Section
+            // 1. Language Selection Section (clean, compact, no large container)
             item {
                 LanguageSelectionSection(
                     isArabic = isArabic,
@@ -193,31 +197,23 @@ fun SettingsScreen(
                 )
             }
 
-            // 3. QR Code Offline Sync Section ("دون إنترنت" badge, dual glowing action buttons)
+            // 3. QR Code Offline Sync Section (single clean action button to transfer)
             item {
                 QrCodeOfflineSyncSection(
                     isArabic = isArabic,
-                    onShareQr = {
+                    onOpenTransfer = {
                         qrDialogInitialMode = false
-                        showQrDialog = true
-                    },
-                    onImportQr = {
-                        qrDialogInitialMode = true
                         showQrDialog = true
                     }
                 )
             }
 
-            // 4. Google Drive Cloud Backup Section ("سحابي" badge, last backup, Backup & Restore)
+            // 4. Google Drive Cloud Backup Section (single clean action button to drive)
             item {
                 GoogleDriveBackupSection(
                     isArabic = isArabic,
-                    lastBackupDate = lastBackupDate,
-                    onBackup = {
-                        createDocLauncher.launch("ShopyPulse_Backup_${System.currentTimeMillis()}.json")
-                    },
-                    onRestore = {
-                        openDocLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+                    onOpenDrive = {
+                        showDriveDialog = true
                     }
                 )
             }
@@ -248,6 +244,21 @@ fun SettingsScreen(
             )
         }
 
+        // Dedicated Google Drive Backup & Restore Dialog
+        if (showDriveDialog) {
+            GoogleDriveDialog(
+                isArabic = isArabic,
+                lastBackupDate = lastBackupDate,
+                onDismiss = { showDriveDialog = false },
+                onBackup = {
+                    createDocLauncher.launch("ShopyPulse_Backup_${System.currentTimeMillis()}.json")
+                },
+                onRestore = {
+                    openDocLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+                }
+            )
+        }
+
         // Circular Reveal Transition Animation Overlay for Light/Dark Mode Switch
         if (revealTargetDark != null) {
             CircularRevealThemeOverlay(
@@ -265,64 +276,40 @@ fun SettingsScreen(
 }
 
 /**
- * Screen Top Header with Frosted Back Button
+ * Screen Top Header without Back Arrow, title strictly on one line.
  */
 @Composable
 private fun SettingsScreenHeader(
-    isArabic: Boolean,
-    onBack: () -> Unit
+    isArabic: Boolean
 ) {
-    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
-    val backBtnBg = if (isLight) Color.White else Color(0x331E293B)
-    val backBtnBorder = if (isLight) BorderStroke(1.dp, LightCardBorder) else BorderStroke(1.dp, Color(0x33475569))
-
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(top = 4.dp, bottom = 8.dp)
     ) {
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier
-                .clip(CircleShape)
-                .background(backBtnBg)
-                .border(backBtnBorder, CircleShape)
-                .size(44.dp)
-                .testTag("settings_back_button")
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                tint = if (isLight) CyanTintText else ElectricCyan,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.width(14.dp))
-
-        Column {
-            Text(
-                text = if (isArabic) "الإعدادات" else "Settings",
-                color = TextPrimary,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = (-0.5).sp,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Clip
-            )
-            Text(
-                text = if (isArabic) "تخصيص التطبيق، مزامنة ونقل البيانات" else "Preferences, data sync & app settings",
-                color = TextSecondary,
-                fontSize = 12.sp
-            )
-        }
+        Text(
+            text = if (isArabic) "الإعدادات" else "Settings",
+            color = TextPrimary,
+            fontSize = 26.sp,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = (-0.5).sp,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Clip
+        )
+        Spacer(modifier = Modifier.height(3.dp))
+        Text(
+            text = if (isArabic) "تخصيص التطبيق، مزامنة ونقل البيانات" else "Preferences, data sync & app settings",
+            color = TextSecondary,
+            fontSize = 12.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
 /**
- * 1. Language Selection Section
+ * 1. Language Selection Section (compact, no large outer card)
  */
 @Composable
 private fun LanguageSelectionSection(
@@ -336,54 +323,36 @@ private fun LanguageSelectionSection(
             accentColor = ElectricCyan
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        NeumorphicGlassCard(
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            glowColor = ElectricCyan.copy(alpha = 0.45f)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = if (isArabic) "اختر لغة واجهة التطبيق:" else "Choose application interface language:",
-                    color = TextSecondary,
-                    fontSize = 13.sp
-                )
+            CompactLanguagePill(
+                title = "العربية",
+                isSelected = isArabic,
+                onClick = { onLanguageSelect(true) },
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("language_arabic")
+            )
 
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    LanguagePillCard(
-                        title = "Arabic",
-                        subtitle = "العربية",
-                        isSelected = isArabic,
-                        onClick = { onLanguageSelect(true) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("language_arabic")
-                    )
-
-                    LanguagePillCard(
-                        title = "English",
-                        subtitle = "الإنجليزية",
-                        isSelected = !isArabic,
-                        onClick = { onLanguageSelect(false) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("language_english")
-                    )
-                }
-            }
+            CompactLanguagePill(
+                title = "English",
+                isSelected = !isArabic,
+                onClick = { onLanguageSelect(false) },
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("language_english")
+            )
         }
     }
 }
 
 @Composable
-private fun LanguagePillCard(
+private fun CompactLanguagePill(
     title: String,
-    subtitle: String,
     isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -407,36 +376,31 @@ private fun LanguagePillCard(
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
+            .height(44.dp)
+            .clip(RoundedCornerShape(12.dp))
             .background(pillBg)
-            .border(pillBorder, RoundedCornerShape(16.dp))
+            .border(pillBorder, RoundedCornerShape(12.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(bounded = true, color = ElectricCyan),
                 onClick = onClick
             )
-            .padding(vertical = 12.dp, horizontal = 14.dp),
+            .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = title,
-                    color = titleColor,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = subtitle,
-                    color = if (isSelected) titleColor.copy(alpha = 0.85f) else TextSecondary,
-                    fontSize = 11.sp
-                )
-            }
+            Text(
+                text = title,
+                color = titleColor,
+                fontSize = 14.5.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                maxLines = 1
+            )
             if (isSelected) {
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(6.dp))
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
                     contentDescription = null,
@@ -607,14 +571,12 @@ fun NeumorphicGlowingSwitch(
 
 /**
  * 3. QR Code Offline Sync Section
- * Features an offline badge ("دون إنترنت"), descriptive text,
- * and dual action buttons: "مشاركة القائمة" in vibrant green and "استيراد القائمة" in cyan.
+ * Streamlined to a single clean action button leading directly to the transfer & sync page.
  */
 @Composable
 private fun QrCodeOfflineSyncSection(
     isArabic: Boolean,
-    onShareQr: () -> Unit,
-    onImportQr: () -> Unit
+    onOpenTransfer: () -> Unit
 ) {
     Column {
         SectionHeader(
@@ -623,185 +585,26 @@ private fun QrCodeOfflineSyncSection(
             accentColor = EmeraldSavings
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        NeumorphicGlassCard(
-            modifier = Modifier.fillMaxWidth(),
-            glowColor = EmeraldSavings.copy(alpha = 0.45f)
-        ) {
-            Column(modifier = Modifier.padding(18.dp)) {
-                // Header with QR Icon, Title and Offline Badge ("دون إنترنت")
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(EmeraldSavings.copy(alpha = 0.16f))
-                                .border(BorderStroke(1.dp, EmeraldSavings.copy(alpha = 0.6f)), RoundedCornerShape(12.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.QrCode,
-                                contentDescription = null,
-                                tint = EmeraldSavings,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = if (isArabic) "المزامنة المباشرة بـ QR Code" else "Direct QR Sync",
-                                color = TextPrimary,
-                                fontSize = 15.5.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = if (isArabic) "نقل واستيراد القوائم فلاشياً بدون إنترنت" else "Share & import lists offline instantly",
-                                color = TextSecondary,
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
-
-                    // Offline Badge Chip ("دون إنترنت")
-                    NeonBadgeChip(
-                        text = if (isArabic) "دون إنترنت" else "OFFLINE",
-                        accentColor = EmeraldSavings
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Descriptive Text
-                Text(
-                    text = if (isArabic) {
-                        "يمكنك عرض كود QR لمسحه من هاتف آخر ونقل كامل قائمة المشتريات فوراً، أو استيراد قائمة جديدة عبر لصق الكود."
-                    } else {
-                        "Display a QR code to transfer your shopping list to another device, or import a shared list by pasting/scanning."
-                    },
-                    color = TextSecondary,
-                    fontSize = 12.5.sp,
-                    lineHeight = 18.sp
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Dual Glowing Action Buttons:
-                // Button 1: "مشاركة القائمة" in vibrant green
-                // Button 2: "استيراد القائمة" in cyan
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // "مشاركة القائمة" Button (Vibrant Green)
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(46.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(EmeraldSavings, EmeraldSavings.copy(alpha = 0.85f))
-                                )
-                            )
-                            .border(BorderStroke(1.dp, EmeraldSavings), RoundedCornerShape(12.dp))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = ripple(bounded = true, color = Color.White),
-                                onClick = onShareQr
-                            )
-                            .padding(horizontal = 8.dp)
-                            .testTag("qr_share_button"),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Share,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(17.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (isArabic) "مشاركة القائمة" else "Share via QR",
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-
-                    // "استيراد القائمة" Button (Cyan)
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(46.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(ElectricCyan, ElectricCyan.copy(alpha = 0.85f))
-                                )
-                            )
-                            .border(BorderStroke(1.dp, ElectricCyan), RoundedCornerShape(12.dp))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = ripple(bounded = true, color = Color.White),
-                                onClick = onImportQr
-                            )
-                            .padding(horizontal = 8.dp)
-                            .testTag("qr_import_button"),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Download,
-                                contentDescription = null,
-                                tint = Color(0xFF04121B),
-                                modifier = Modifier.size(17.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (isArabic) "استيراد القائمة" else "Import List",
-                                color = Color(0xFF04121B),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
-            }
-        }
+        SingleActionNavButton(
+            icon = Icons.Default.QrCode,
+            title = if (isArabic) "نقل ومشاركة القوائم (QR Code)" else "Transfer & Share Lists via QR",
+            accentColor = EmeraldSavings,
+            onClick = onOpenTransfer,
+            testTag = "open_qr_transfer_button"
+        )
     }
 }
 
 /**
  * 4. Google Drive Cloud Backup Section
- * Features a cloud badge ("سحابي"), last backup status, and "Backup" / "Restore" buttons.
+ * Streamlined to a single clean action button opening the Google Drive Backup & Restore dialog.
  */
 @Composable
 private fun GoogleDriveBackupSection(
     isArabic: Boolean,
-    lastBackupDate: String,
-    onBackup: () -> Unit,
-    onRestore: () -> Unit
+    onOpenDrive: () -> Unit
 ) {
     Column {
         SectionHeader(
@@ -810,162 +613,242 @@ private fun GoogleDriveBackupSection(
             accentColor = ElectricCyan
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        NeumorphicGlassCard(
+        SingleActionNavButton(
+            icon = Icons.Default.CloudDone,
+            title = if (isArabic) "النسخ الاحتياطي والاستعادة (Google Drive)" else "Google Drive Backup & Restore",
+            accentColor = ElectricCyan,
+            onClick = onOpenDrive,
+            testTag = "open_google_drive_button"
+        )
+    }
+}
+
+/**
+ * Clean Single Action Nav Button without clutter
+ */
+@Composable
+private fun SingleActionNavButton(
+    icon: ImageVector,
+    title: String,
+    accentColor: Color,
+    onClick: () -> Unit,
+    testTag: String,
+    modifier: Modifier = Modifier
+) {
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+    val btnBg = if (isLight) Color.White else Color(0x221E293B)
+    val btnBorder = if (isLight) BorderStroke(1.dp, LightCardBorder) else BorderStroke(1.dp, Color(0x33475569))
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(btnBg)
+            .border(btnBorder, RoundedCornerShape(14.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(bounded = true, color = accentColor),
+                onClick = onClick
+            )
+            .padding(horizontal = 16.dp)
+            .testTag(testTag),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            glowColor = ElectricCyan.copy(alpha = 0.45f)
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(modifier = Modifier.padding(18.dp)) {
-                // Header with Cloud Icon, Title, and Cloud Badge ("سحابي")
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(accentColor.copy(alpha = 0.15f))
+                        .border(BorderStroke(1.dp, accentColor.copy(alpha = 0.4f)), RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(ElectricCyan.copy(alpha = 0.2f))
-                                .border(BorderStroke(1.dp, ElectricCyan.copy(alpha = 0.6f)), RoundedCornerShape(12.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CloudDone,
-                                contentDescription = null,
-                                tint = ElectricCyan,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = "Google Drive Sync",
-                                color = TextPrimary,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = if (isArabic) "حفظ القوائم والأسعار في سحابتك" else "Sync lists & prices to your cloud",
-                                color = TextSecondary,
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
-
-                    // Cloud Badge ("سحابي")
-                    NeonBadgeChip(
-                        text = if (isArabic) "سحابي" else "CLOUD",
-                        accentColor = ElectricCyan
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
-                // Last Backup Status
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = title,
+                    color = TextPrimary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = TextSecondary,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+/**
+ * Dedicated Google Drive Backup & Restore Dialog
+ */
+@Composable
+private fun GoogleDriveDialog(
+    isArabic: Boolean,
+    lastBackupDate: String,
+    onDismiss: () -> Unit,
+    onBackup: () -> Unit,
+    onRestore: () -> Unit
+) {
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+    val dialogBg = if (isLight) Color(0xFFF8FAFC) else Color(0xFF0F172A)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = if (isArabic) "إغلاق" else "Close",
+                    color = ElectricCyan,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(ElectricCyan.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
                     Icon(
-                        imageVector = Icons.Default.DateRange,
+                        imageVector = Icons.Default.CloudDone,
                         contentDescription = null,
                         tint = ElectricCyan,
-                        modifier = Modifier.size(15.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (lastBackupDate.isNotBlank()) {
-                            if (isArabic) "آخر نسخ احتياطي: $lastBackupDate" else "Last Backup: $lastBackupDate"
-                        } else {
-                            if (isArabic) "لم يتم عمل نسخة احتياطية بعد" else "No backup recorded yet"
-                        },
-                        color = if (lastBackupDate.isNotBlank()) EmeraldSavings else TextMuted,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
+                        modifier = Modifier.size(20.dp)
                     )
                 }
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = if (isArabic) "Google Drive" else "Google Drive Sync",
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp
+                )
+            }
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = if (lastBackupDate.isNotBlank()) {
+                        if (isArabic) "آخر نسخ احتياطي: $lastBackupDate" else "Last Backup: $lastBackupDate"
+                    } else {
+                        if (isArabic) "لم يتم عمل نسخ احتياطي بعد" else "No backup recorded yet"
+                    },
+                    color = if (lastBackupDate.isNotBlank()) EmeraldSavings else TextMuted,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Medium
+                )
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Dual Action Buttons: "Backup" / "Restore"
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                // Backup Button
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(EmeraldSavings.copy(alpha = 0.18f))
+                        .border(BorderStroke(1.2.dp, EmeraldSavings), RoundedCornerShape(12.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(bounded = true, color = EmeraldSavings),
+                            onClick = {
+                                onBackup()
+                                onDismiss()
+                            }
+                        )
+                        .padding(horizontal = 14.dp)
+                        .testTag("dialog_drive_backup_button"),
+                    contentAlignment = Alignment.Center
                 ) {
-                    // Backup Button
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(EmeraldSavings.copy(alpha = 0.18f))
-                            .border(BorderStroke(1.2.dp, EmeraldSavings), RoundedCornerShape(12.dp))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = ripple(bounded = true, color = EmeraldSavings),
-                                onClick = onBackup
-                            )
-                            .padding(horizontal = 8.dp)
-                            .testTag("drive_backup_button"),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.CloudUpload,
-                                contentDescription = null,
-                                tint = EmeraldSavings,
-                                modifier = Modifier.size(17.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (isArabic) "نسخ احتياطي" else "Backup",
-                                color = EmeraldSavings,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.CloudUpload,
+                            contentDescription = null,
+                            tint = EmeraldSavings,
+                            modifier = Modifier.size(17.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isArabic) "نسخ احتياطي جديد" else "New Backup to Drive",
+                            color = EmeraldSavings,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
+                }
 
-                    // Restore Button
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(ElectricCyan.copy(alpha = 0.18f))
-                            .border(BorderStroke(1.2.dp, ElectricCyan), RoundedCornerShape(12.dp))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = ripple(bounded = true, color = ElectricCyan),
-                                onClick = onRestore
-                            )
-                            .padding(horizontal = 8.dp)
-                            .testTag("drive_restore_button"),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.CloudDownload,
-                                contentDescription = null,
-                                tint = ElectricCyan,
-                                modifier = Modifier.size(17.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (isArabic) "استعادة" else "Restore",
-                                color = ElectricCyan,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Restore Button
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(ElectricCyan.copy(alpha = 0.18f))
+                        .border(BorderStroke(1.2.dp, ElectricCyan), RoundedCornerShape(12.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(bounded = true, color = ElectricCyan),
+                            onClick = {
+                                onRestore()
+                                onDismiss()
+                            }
+                        )
+                        .padding(horizontal = 14.dp)
+                        .testTag("dialog_drive_restore_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.CloudDownload,
+                            contentDescription = null,
+                            tint = ElectricCyan,
+                            modifier = Modifier.size(17.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isArabic) "استعادة نسخة سابقة" else "Restore from Drive",
+                            color = ElectricCyan,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
-        }
-    }
+        },
+        containerColor = dialogBg,
+        shape = RoundedCornerShape(20.dp)
+    )
 }
 
 /**
