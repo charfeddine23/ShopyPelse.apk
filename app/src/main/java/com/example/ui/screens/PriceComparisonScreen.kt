@@ -103,6 +103,7 @@ import com.example.data.model.StoreBasketSummary
 import com.example.ui.components.GlowingActionButton
 import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.NeonBadge
+import com.example.ui.components.horizontalFadingEdge
 import com.example.ui.theme.BackgroundLight
 import com.example.ui.theme.CyanTintBg
 import com.example.ui.theme.CyanTintBorder
@@ -466,7 +467,9 @@ fun PriceComparisonScreen(
                 ) {
                     androidx.compose.foundation.lazy.LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalFadingEdge(fadeWidth = 20.dp)
                     ) {
                         items(LocalizationUtil.allCategories.size) { idx ->
                             val cat = LocalizationUtil.allCategories[idx]
@@ -1781,7 +1784,12 @@ private fun AddProductOrGroupDialog(
                     fontWeight = FontWeight.SemiBold
                 )
                 val categories = listOf("Dairy", "Beverages", "Pantry", "Bakery", "Butchery", "Produce", "Cleaning", "SweetsNuts")
-                androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                androidx.compose.foundation.lazy.LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalFadingEdge(fadeWidth = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     items(categories.size) { idx ->
                         val cat = categories[idx]
                         val isCatSel = selectedCategory == cat
@@ -1811,7 +1819,12 @@ private fun AddProductOrGroupDialog(
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.SemiBold
                 )
-                androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                androidx.compose.foundation.lazy.LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalFadingEdge(fadeWidth = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     items(stores.size) { idx ->
                         val store = stores[idx]
                         val isStoreSel = selectedStoreIndex == idx

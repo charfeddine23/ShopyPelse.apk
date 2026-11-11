@@ -97,6 +97,7 @@ import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.NeonBadge
 import com.example.ui.components.SwipeToDeleteContainer
 import com.example.ui.components.WindGlowAppNameBanner
+import com.example.ui.components.horizontalFadingEdge
 import com.example.ui.theme.BackgroundLight
 import com.example.ui.theme.CheckedGreen
 import com.example.ui.theme.CyanTintBg
@@ -387,6 +388,7 @@ fun HomeScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .horizontalFadingEdge(fadeWidth = 16.dp)
                                 .horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
@@ -613,6 +615,9 @@ private fun FrequentItemsSection(
         Spacer(modifier = Modifier.height(8.dp))
 
         LazyRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalFadingEdge(fadeWidth = 20.dp),
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -679,6 +684,7 @@ private fun CategoryChipsSection(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .horizontalFadingEdge(fadeWidth = 20.dp)
             .horizontalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
