@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
@@ -116,6 +117,7 @@ fun SettingsScreen(
     val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
     val lastBackupDate by viewModel.lastBackupDate.collectAsStateWithLifecycle()
     val isDynamicGlowEnabled by viewModel.isDynamicGlowEnabled.collectAsStateWithLifecycle()
+    val isLiquidDockSwipeEnabled by viewModel.isLiquidDockSwipeEnabled.collectAsStateWithLifecycle()
 
     var showQrDialog by remember { mutableStateOf(false) }
     var qrDialogInitialMode by remember { mutableStateOf(false) }
@@ -206,6 +208,17 @@ fun SettingsScreen(
                     isArabic = isArabic,
                     onToggleChange = { enabled ->
                         viewModel.setDynamicGlowEnabled(enabled)
+                    }
+                )
+            }
+
+            // 2c. Liquid Glass Dock Swipe Effect Toggle
+            item {
+                LiquidDockSwipeToggleSection(
+                    isEnabled = isLiquidDockSwipeEnabled,
+                    isArabic = isArabic,
+                    onToggleChange = { enabled ->
+                        viewModel.setLiquidDockSwipeEnabled(enabled)
                     }
                 )
             }
@@ -563,6 +576,77 @@ private fun DynamicGlowToggleSection(
 }
 
 /**
+ * 2c. Liquid Glass Dock Swipe Effect Toggle Section
+ */
+@Composable
+private fun LiquidDockSwipeToggleSection(
+    isEnabled: Boolean,
+    isArabic: Boolean,
+    onToggleChange: (Boolean) -> Unit
+) {
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+
+    NeumorphicGlassCard(
+        modifier = Modifier.fillMaxWidth(),
+        glowColor = if (isEnabled) EmeraldSavings.copy(alpha = 0.30f) else Color.Transparent
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 11.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(if (isEnabled) EmeraldSavings.copy(alpha = 0.15f) else Color(0x18777777)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.CompareArrows,
+                        contentDescription = null,
+                        tint = if (isEnabled) EmeraldSavings else TextSecondary,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Column {
+                    Text(
+                        text = if (isArabic) "تمرير الدوك بالزجاج السائل" else "Liquid Glass Dock Swipe",
+                        color = TextPrimary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = if (isArabic) "فقاعة وقطرة ذيل للتنقل بين الصفحات" else "Fluid droplet gesture navigation",
+                        color = if (isEnabled) EmeraldSavings else TextSecondary,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+
+            NeumorphicGlowingSwitch(
+                checked = isEnabled,
+                onCheckedChange = onToggleChange,
+                activeColor = EmeraldSavings,
+                inactiveColor = if (isLight) Color(0xFFCBD5E1) else Color(0xFF475569),
+                checkedIcon = Icons.AutoMirrored.Filled.CompareArrows,
+                uncheckedIcon = Icons.AutoMirrored.Filled.CompareArrows,
+                modifier = Modifier.testTag("liquid_dock_swipe_switch")
+            )
+        }
+    }
+}
+
+/**
  * Custom Neumorphic Switch Toggle with Animated Glowing Active States
  */
 @Composable
@@ -680,7 +764,7 @@ private fun GoogleDriveBackupSection(
 ) {
     SingleActionNavButton(
         icon = Icons.Default.CloudDone,
-        title = if (isArabic) "النسخ الاحتياطي والاستعادة (Google Drive)" else "Google Drive Backup & Restore",
+        title = if (isArabic) "النسخ الاحتياطي  (Google Drive)" else "Google Drive Backup",
         accentColor = ElectricCyan,
         onClick = onOpenDrive,
         testTag = "open_google_drive_button"
@@ -915,55 +999,70 @@ private fun GoogleDriveDialog(
 
 /**
  * 5. App & Developer Info Section
- * Displays "Developed by Kahlessenane Charfeddine" with verified badge,
- * app name "Shopy Pulse (شوبي بلس)", version (v1.0 Build 1), last update date,
- * and tech stack (Jetpack Compose • Room DB).
+ * Redesigned with precision, modern glass aesthetics, and verified badge.
  */
 @Composable
 private fun DeveloperInfoSection(
     isArabic: Boolean
 ) {
-    Column {
-        SectionHeader(
-            icon = Icons.Default.Info,
-            title = if (isArabic) "معلومات التطبيق والمطور" else "App & Developer Info",
-            accentColor = ElectricCyan
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+    val cardBg = if (isLight) Color(0xF7FFFFFF) else Color(0xD90E1726)
+    val cardBorder = if (isLight) {
+        BorderStroke(1.2.dp, LightCardBorder)
+    } else {
+        BorderStroke(
+            1.2.dp,
+            Brush.horizontalGradient(
+                listOf(
+                    ElectricCyan.copy(alpha = 0.45f),
+                    EmeraldSavings.copy(alpha = 0.35f),
+                    Color(0x33475569)
+                )
+            )
         )
+    }
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        NeumorphicGlassCard(
-            modifier = Modifier.fillMaxWidth(),
-            glowColor = ElectricCyan.copy(alpha = 0.4f)
-        ) {
-            Column(modifier = Modifier.padding(18.dp)) {
-                val isLightCard = MaterialTheme.colorScheme.background == BackgroundLight
-                val devBannerBg = if (isLightCard) CyanTintBg else Color(0x2800E5FF)
-                val devBannerBorder = if (isLightCard) BorderStroke(1.dp, CyanTintBorder) else BorderStroke(1.dp, Color(0x6600E5FF))
-
-                // Developer Banner with Avatar and Verified Badge
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(cardBg)
+            .border(cardBorder, RoundedCornerShape(22.dp))
+            .padding(18.dp)
+            .testTag("developer_info_card")
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Top Profile Row: Glowing Monogram Avatar + Developer Name + Status Pill
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(devBannerBg)
-                        .border(devBannerBorder, RoundedCornerShape(14.dp))
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
                 ) {
+                    // Stylized Liquid Glowing Avatar
                     Box(
                         modifier = Modifier
                             .size(46.dp)
                             .clip(CircleShape)
-                            .background(ElectricCyan)
-                            .border(BorderStroke(2.dp, Color.White), CircleShape),
+                            .background(
+                                Brush.sweepGradient(
+                                    listOf(ElectricCyan, EmeraldSavings, Color(0xFF8B5CF6), ElectricCyan)
+                                )
+                            )
+                            .padding(2.dp)
+                            .clip(CircleShape)
+                            .background(if (isLight) Color.White else Color(0xFF09101D)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = null,
-                            tint = Color(0xFF031422),
-                            modifier = Modifier.size(28.dp)
+                        Text(
+                            text = "CK",
+                            color = if (isLight) CyanTintText else ElectricCyan,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = (-0.5).sp
                         )
                     }
 
@@ -974,8 +1073,9 @@ private fun DeveloperInfoSection(
                             Text(
                                 text = ShoppingViewModel.DEVELOPER_NAME,
                                 color = TextPrimary,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.ExtraBold
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = (-0.3).sp
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Icon(
@@ -987,46 +1087,131 @@ private fun DeveloperInfoSection(
                         }
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = if (isArabic) "مهندس ومطور التطبيق الرسمي" else "Lead Mobile Software Engineer & UI/UX Designer",
-                            color = if (isLightCard) CyanTintText else ElectricCyan,
+                            text = "Shopy Pulse Official",
+                            color = if (isLight) CyanTintText else ElectricCyan.copy(alpha = 0.85f),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                // Delicate Status Badge
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isLight) CyanTintBg else Color(0x2200E5FF))
+                        .border(
+                            BorderStroke(1.dp, if (isLight) CyanTintBorder else ElectricCyan.copy(alpha = 0.5f)),
+                            RoundedCornerShape(12.dp)
+                        )
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = "v1.0",
+                        color = if (isLight) CyanTintText else ElectricCyan,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
 
-                // App Name
-                InfoKeyValueRow(
-                    label = if (isArabic) "اسم التطبيق" else "App Name",
-                    value = "Shopy Pulse (شوبي بلس)"
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Soft Horizontal Hairline Divider
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                Color.Transparent,
+                                if (isLight) Color(0x22000000) else Color(0x33475569),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Precision Metadata Grid (2x2 Clean Layout)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Item 1: App Name
+                DeveloperInfoMicroCard(
+                    title = if (isArabic) "التطبيق" else "App",
+                    value = "Shopy Pulse",
+                    modifier = Modifier.weight(1f)
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Version Code
-                InfoKeyValueRow(
-                    label = if (isArabic) "رقم الإصدار" else "Version Code",
-                    value = ShoppingViewModel.APP_VERSION
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Last Update Date
-                InfoKeyValueRow(
-                    label = if (isArabic) "تاريخ آخر تحديث" else "Last Updated",
-                    value = if (isArabic) ShoppingViewModel.LAST_UPDATE_DATE_AR else ShoppingViewModel.LAST_UPDATE_DATE_EN
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Tech Stack
-                InfoKeyValueRow(
-                    label = if (isArabic) "الواجهة والتقنيات" else "Tech Stack",
-                    value = "Jetpack Compose • Room DB"
+                // Item 2: Engine Stack
+                DeveloperInfoMicroCard(
+                    title = if (isArabic) "المحرك" else "Stack",
+                    value = "Compose • Room",
+                    modifier = Modifier.weight(1f)
                 )
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Item 3: Build Version
+                DeveloperInfoMicroCard(
+                    title = if (isArabic) "الإصدار" else "Version",
+                    value = ShoppingViewModel.APP_VERSION,
+                    modifier = Modifier.weight(1f)
+                )
+
+                // Item 4: Last Update Date
+                DeveloperInfoMicroCard(
+                    title = if (isArabic) "التحديث" else "Updated",
+                    value = if (isArabic) ShoppingViewModel.LAST_UPDATE_DATE_AR else ShoppingViewModel.LAST_UPDATE_DATE_EN,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeveloperInfoMicroCard(
+    title: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+    val itemBg = if (isLight) Color(0xFFF8FAFC) else Color(0x181E293B)
+    val itemBorder = if (isLight) BorderStroke(1.dp, Color(0xFFE2E8F0)) else BorderStroke(1.dp, Color(0x22475569))
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(itemBg)
+            .border(itemBorder, RoundedCornerShape(12.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+    ) {
+        Column {
+            Text(
+                text = title,
+                color = TextSecondary,
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = value,
+                color = TextPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

@@ -106,6 +106,13 @@ class ShoppingViewModel(
         _isDynamicGlowEnabled.value = enabled
     }
 
+    private val _isLiquidDockSwipeEnabled = MutableStateFlow(true)
+    val isLiquidDockSwipeEnabled: StateFlow<Boolean> = _isLiquidDockSwipeEnabled.asStateFlow()
+
+    fun setLiquidDockSwipeEnabled(enabled: Boolean) {
+        _isLiquidDockSwipeEnabled.value = enabled
+    }
+
     val frequentPresets: List<ShoppingItem> = DatabaseInitialData.frequentPresets
 
     init {
