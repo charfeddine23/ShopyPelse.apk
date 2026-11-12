@@ -6,50 +6,50 @@
     android:viewportHeight="108">
 
     <group>
-        <!-- Shopping Bag Handle -->
+        <!-- Shopping Bag Curved Handle -->
         <path
-            android:pathData="M44,40 L44,32 C44,26.48 48.48,22 54,22 C59.52,22 64,26.48 64,32 L64,40"
-            android:strokeWidth="4"
+            android:pathData="M45,39 C45,31 49,26 54,26 C59,26 63,31 63,39"
+            android:strokeWidth="4.5"
             android:strokeColor="#00E5FF"
             android:strokeLineCap="round"
             android:strokeLineJoin="round"
             android:fillColor="#00000000" />
 
-        <!-- Shopping Bag Body Translucent Glass Fill -->
+        <!-- Shopping Bag Inner Glow / Body Fill (Dark Slate Glass for contrast on any wallpaper) -->
         <path
-            android:pathData="M36,40 L72,40 C74.76,40 76.94,42.24 76.65,44.98 L73.15,75.98 C72.87,78.27 70.93,80 68.62,80 L39.38,80 C37.07,80 35.13,78.27 34.85,75.98 L31.35,44.98 C31.06,42.24 33.24,40 36,40 Z"
-            android:fillColor="#2200E5FF" />
+            android:pathData="M38,39 L70,39 C72.5,39 74.5,41 74.2,43.5 L71.2,76.5 C70.9,78.5 69.2,80 67.2,80 L40.8,80 C38.8,80 37.1,78.5 36.8,76.5 L33.8,43.5 C33.5,41 35.5,39 38,39 Z"
+            android:fillColor="#0E1726" />
 
-        <!-- Shopping Bag Outline -->
+        <!-- Shopping Bag Body Stroke (Vibrant Cyan) -->
         <path
-            android:pathData="M36,40 L72,40 C74.76,40 76.94,42.24 76.65,44.98 L73.15,75.98 C72.87,78.27 70.93,80 68.62,80 L39.38,80 C37.07,80 35.13,78.27 34.85,75.98 L31.35,44.98 C31.06,42.24 33.24,40 36,40 Z"
-            android:strokeWidth="3.5"
-            android:strokeColor="#00E5FF"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round"
-            android:fillColor="#00000000" />
-
-        <!-- Pulse Waveform Subtle Glow Layer -->
-        <path
-            android:pathData="M26,61 L41,61 L46,51 L50.5,70 L55,48 L59,67 L63,61 L82,61"
-            android:strokeWidth="6"
-            android:strokeColor="#4000E676"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round"
-            android:fillColor="#00000000" />
-
-        <!-- Neon Pulse Waveform (Sharp Foreground) -->
-        <path
-            android:pathData="M26,61 L41,61 L46,51 L50.5,70 L55,48 L59,67 L63,61 L82,61"
+            android:pathData="M38,39 L70,39 C72.5,39 74.5,41 74.2,43.5 L71.2,76.5 C70.9,78.5 69.2,80 67.2,80 L40.8,80 C38.8,80 37.1,78.5 36.8,76.5 L33.8,43.5 C33.5,41 35.5,39 38,39 Z"
             android:strokeWidth="3.6"
+            android:strokeColor="#00E5FF"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000" />
+
+        <!-- Neon Heartbeat Pulse (Pulse Glow) -->
+        <path
+            android:pathData="M27,60 L41,60 L45.5,50 L49.5,69 L54,46 L58,66 L62.5,60 L81,60"
+            android:strokeWidth="5.5"
+            android:strokeColor="#3300E676"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000" />
+
+        <!-- Sharp Neon Heartbeat Pulse (Emerald Green) -->
+        <path
+            android:pathData="M27,60 L41,60 L45.5,50 L49.5,69 L54,46 L58,66 L62.5,60 L81,60"
+            android:strokeWidth="3.4"
             android:strokeColor="#00E676"
             android:strokeLineCap="round"
             android:strokeLineJoin="round"
             android:fillColor="#00000000" />
 
-        <!-- Peak Pulse Spark Dot -->
+        <!-- Dynamic Peak Pulse Star Sparkle -->
         <path
-            android:pathData="M55,42 A2.5,2.5 0 1,1 55,41.99"
-            android:fillColor="#00E5FF" />
+            android:pathData="M54,39 L55.2,42.8 L59,44 L55.2,45.2 L54,49 L52.8,45.2 L49,44 L52.8,42.8 Z"
+            android:fillColor="#FFFFFF" />
     </group>
 </vector>
