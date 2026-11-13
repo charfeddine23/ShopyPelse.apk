@@ -41,7 +41,6 @@ import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Person
@@ -55,13 +54,11 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,7 +70,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -105,13 +101,9 @@ import com.example.ui.theme.TextSecondary
 import com.example.BuildConfig
 import com.example.ui.viewmodel.ShoppingViewModel
 import com.example.util.ApkDownloadState
-import com.example.util.AppUpdateChecker
 import com.example.util.AppUpdateStatus
 import java.io.BufferedReader
 import java.io.InputStreamReader
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * Production-ready Settings Screen for 'Shopy Pulse' matching the Dark Slate
@@ -132,13 +124,11 @@ fun SettingsScreen(
     val isDynamicGlowEnabled by viewModel.isDynamicGlowEnabled.collectAsStateWithLifecycle()
     val isLiquidDockSwipeEnabled by viewModel.isLiquidDockSwipeEnabled.collectAsStateWithLifecycle()
     val updateStatus by viewModel.updateStatus.collectAsStateWithLifecycle()
-    val lastUpdateCheckTimestamp by viewModel.lastUpdateCheckTimestamp.collectAsStateWithLifecycle()
     val apkDownloadState by viewModel.apkDownloadState.collectAsStateWithLifecycle()
 
     var showQrDialog by remember { mutableStateOf(false) }
     var qrDialogInitialMode by remember { mutableStateOf(false) }
     var showDriveDialog by remember { mutableStateOf(false) }
-    var showUpdateDialog by remember { mutableStateOf(false) }
 
     // Circular Reveal animation states for Light/Dark mode transition
     var revealTargetDark by remember { mutableStateOf<Boolean?>(null) }
@@ -268,11 +258,17 @@ fun SettingsScreen(
                     updateStatus = updateStatus,
                     apkDownloadState = apkDownloadState,
                     onOpenUpdate = {
-                        if (updateStatus is AppUpdateStatus.UpdateAvailable) {
-                            viewModel.openUpdateOverlayIfAvailable()
-                        } else {
-                            showUpdateDialog = true
-                            viewModel.checkForUpdates(autoOpenOverlay = true)
+                        when {
+                            apkDownloadState is ApkDownloadState.Downloaded ||
+                                apkDownloadState is ApkDownloadState.RequiresInstallPermission -> {
+                                viewModel.installDownloadedApk(context)
+                            }
+                            updateStatus is AppUpdateStatus.UpdateAvailable -> {
+                                viewModel.openUpdateOverlayIfAvailable()
+                            }
+                            else -> {
+                                viewModel.checkForUpdates(autoOpenOverlay = true)
+                            }
                         }
                     }
                 )
@@ -316,30 +312,6 @@ fun SettingsScreen(
                 onRestore = {
                     openDocLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
                 }
-            )
-        }
-
-        // Dismiss status dialog automatically when an update is found so AppUpdateOverlay shows cleanly
-        LaunchedEffect(updateStatus, showUpdateDialog) {
-            if (showUpdateDialog && updateStatus is AppUpdateStatus.UpdateAvailable) {
-                showUpdateDialog = false
-            }
-        }
-
-        // In-App Update Dialog
-        if (showUpdateDialog) {
-            AppUpdateDialog(
-                isArabic = isArabic,
-                updateStatus = updateStatus,
-                apkDownloadState = apkDownloadState,
-                lastCheckTimestamp = lastUpdateCheckTimestamp,
-                onDismiss = { showUpdateDialog = false },
-                onCheckNow = { viewModel.checkForUpdates() },
-                onStartInAppDownload = { url ->
-                    viewModel.startInAppUpdateDownload(context = context, url = url)
-                },
-                onInstallApk = { viewModel.installDownloadedApk(context) },
-                onCancelDownload = { viewModel.cancelUpdateDownload() }
             )
         }
 
@@ -839,7 +811,8 @@ private fun SingleActionNavButton(
     accentColor: Color,
     onClick: () -> Unit,
     testTag: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isLoading: Boolean = false
 ) {
     val isLight = MaterialTheme.colorScheme.background == BackgroundLight
     val btnBg = if (isLight) Color.White else Color(0x221E293B)
@@ -878,12 +851,20 @@ private fun SingleActionNavButton(
                         .border(BorderStroke(1.dp, accentColor.copy(alpha = 0.4f)), RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = accentColor,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = accentColor,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = accentColor,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -1065,7 +1046,11 @@ private fun AppUpdateSection(
     apkDownloadState: ApkDownloadState,
     onOpenUpdate: () -> Unit
 ) {
-    val hasUpdate = updateStatus is AppUpdateStatus.UpdateAvailable
+    val isChecking = updateStatus is AppUpdateStatus.Checking
+    val availableUpdate = updateStatus as? AppUpdateStatus.UpdateAvailable
+    val hasUpdate = availableUpdate != null
+    val cleanVersion = availableUpdate?.latestVersion?.trim()?.removePrefix("v")?.removePrefix("V").orEmpty()
+
     val title = when (apkDownloadState) {
         is ApkDownloadState.Downloading -> if (isArabic) {
             val pct = if (apkDownloadState.progressPercent >= 0) "${apkDownloadState.progressPercent}%" else "..."
@@ -1081,434 +1066,28 @@ private fun AppUpdateSection(
             "Update Ready to Install"
         }
         else -> when {
-            hasUpdate && isArabic -> "تحديث جديد متاح (${(updateStatus as AppUpdateStatus.UpdateAvailable).latestVersion})"
-            hasUpdate -> "New Update Available (${(updateStatus as AppUpdateStatus.UpdateAvailable).latestVersion})"
-            isArabic -> "تحديث التطبيق"
-            else -> "App Updates"
+            isChecking && isArabic -> "جاري التحقق..."
+            isChecking -> "Checking..."
+            hasUpdate && isArabic -> "تحديث جديد متاح ($cleanVersion)"
+            hasUpdate -> "New Update Available ($cleanVersion)"
+            isArabic -> "لايوجد تحديثات"
+            else -> "No updates available"
         }
     }
+
+    val accentColor = when {
+        isChecking -> ElectricCyan
+        hasUpdate -> NeonAmber
+        else -> EmeraldSavings
+    }
+
     SingleActionNavButton(
         icon = Icons.Default.SystemUpdate,
         title = title,
-        accentColor = if (hasUpdate) NeonAmber else EmeraldSavings,
+        accentColor = accentColor,
         onClick = onOpenUpdate,
-        testTag = "open_app_update_button"
-    )
-}
-
-/**
- * Dedicated In-App Update Dialog (checks GitHub release & downloads/installs APK inside the app)
- */
-@Composable
-private fun AppUpdateDialog(
-    isArabic: Boolean,
-    updateStatus: AppUpdateStatus,
-    apkDownloadState: ApkDownloadState,
-    lastCheckTimestamp: Long,
-    onDismiss: () -> Unit,
-    onCheckNow: () -> Unit,
-    onStartInAppDownload: (String) -> Unit,
-    onInstallApk: () -> Unit,
-    onCancelDownload: () -> Unit
-) {
-    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
-    val dialogBg = if (isLight) Color(0xFFF8FAFC) else Color(0xFF0F172A)
-    val accentColor = if (updateStatus is AppUpdateStatus.UpdateAvailable) NeonAmber else EmeraldSavings
-
-    val downloadUrl = when (updateStatus) {
-        is AppUpdateStatus.UpdateAvailable -> updateStatus.downloadUrl
-        is AppUpdateStatus.ReadyDirectLink -> updateStatus.downloadUrl
-        is AppUpdateStatus.UpToDate -> updateStatus.directUrl
-        is AppUpdateStatus.Error -> updateStatus.fallbackUrl
-        else -> AppUpdateChecker.UPDATE_URL
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(
-                    text = if (isArabic) "إغلاق" else "Close",
-                    color = ElectricCyan,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        },
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(accentColor.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SystemUpdate,
-                        contentDescription = null,
-                        tint = accentColor,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = if (isArabic) "تحديث التطبيق" else "App Updates",
-                    color = TextPrimary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp
-                )
-            }
-        },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                // Current Installed Version
-                Text(
-                    text = if (isArabic) {
-                        "الإصدار الحالي: v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})"
-                    } else {
-                        "Current Version: v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})"
-                    },
-                    color = TextSecondary,
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.Medium
-                )
-
-                if (lastCheckTimestamp > 0L) {
-                    val formatted = remember(lastCheckTimestamp) {
-                        SimpleDateFormat("dd/MM/yyyy - HH:mm", Locale.getDefault()).format(Date(lastCheckTimestamp))
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = if (isArabic) "آخر فحص: $formatted" else "Last checked: $formatted",
-                        color = TextMuted,
-                        fontSize = 11.5.sp
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Status Card
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (isLight) Color.White else Color(0x221E293B))
-                        .border(
-                            BorderStroke(1.dp, accentColor.copy(alpha = 0.35f)),
-                            RoundedCornerShape(12.dp)
-                        )
-                        .padding(12.dp)
-                ) {
-                    when (updateStatus) {
-                        is AppUpdateStatus.Checking -> {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    color = ElectricCyan,
-                                    strokeWidth = 2.dp
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text = if (isArabic) "جاري التحقق من التحديثات..." else "Checking for updates...",
-                                    color = ElectricCyan,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-
-                        is AppUpdateStatus.UpdateAvailable -> {
-                            Column {
-                                Text(
-                                    text = if (isArabic) {
-                                        "يتوفر إصدار جديد: ${updateStatus.latestVersion}"
-                                    } else {
-                                        "New version available: ${updateStatus.latestVersion}"
-                                    },
-                                    color = NeonAmber,
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                if (updateStatus.releaseNotes.isNotBlank()) {
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Text(
-                                        text = updateStatus.releaseNotes,
-                                        color = TextSecondary,
-                                        fontSize = 12.sp,
-                                        maxLines = 3,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-                        }
-
-                        is AppUpdateStatus.UpToDate -> {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = EmeraldSavings,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = if (isArabic) "لديك أحدث إصدار من التطبيق" else "You are on the latest version",
-                                    color = EmeraldSavings,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-
-                        is AppUpdateStatus.ReadyDirectLink -> {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = EmeraldSavings,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = if (isArabic) {
-                                        "رابط التحديث المباشر جاهز للتنزيل"
-                                    } else {
-                                        "Direct update package link is ready"
-                                    },
-                                    color = EmeraldSavings,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-
-                        is AppUpdateStatus.Error -> {
-                            Text(
-                                text = if (isArabic) updateStatus.messageAr else updateStatus.messageEn,
-                                color = NeonAmber,
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-
-                        is AppUpdateStatus.Idle -> {
-                            Text(
-                                text = if (isArabic) "اضغط فحص التحديثات للتحقق من توفر نسخة أحدث" else "Tap Check for Updates to look for new releases",
-                                color = TextSecondary,
-                                fontSize = 12.5.sp
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // In-App APK Download / Progress / Install Section
-                when (apkDownloadState) {
-                    is ApkDownloadState.Idle -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(EmeraldSavings.copy(alpha = 0.18f))
-                                .border(BorderStroke(1.2.dp, EmeraldSavings), RoundedCornerShape(12.dp))
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = ripple(bounded = true, color = EmeraldSavings),
-                                    onClick = { onStartInAppDownload(downloadUrl) }
-                                )
-                                .padding(horizontal = 14.dp)
-                                .testTag("dialog_update_download_button"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.Download,
-                                    contentDescription = null,
-                                    tint = EmeraldSavings,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = if (isArabic) "تحميل وتحديث داخل التطبيق" else "Download & Update In-App",
-                                    color = EmeraldSavings,
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-
-                    is ApkDownloadState.Downloading -> {
-                        val hasTotal = apkDownloadState.totalBytes > 0L && apkDownloadState.progressPercent >= 0
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(EmeraldSavings.copy(alpha = 0.08f))
-                                .border(BorderStroke(1.dp, EmeraldSavings.copy(alpha = 0.35f)), RoundedCornerShape(12.dp))
-                                .padding(12.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = if (isArabic) "جاري التحميل..." else "Downloading...",
-                                    color = TextPrimary,
-                                    fontSize = 12.5.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = if (hasTotal) "${apkDownloadState.progressPercent}%" else "...",
-                                    color = EmeraldSavings,
-                                    fontSize = 12.5.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            if (hasTotal) {
-                                LinearProgressIndicator(
-                                    progress = { (apkDownloadState.progressPercent / 100f).coerceIn(0f, 1f) },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(6.dp)
-                                        .clip(RoundedCornerShape(50)),
-                                    color = EmeraldSavings,
-                                    trackColor = Color(0x3364748B),
-                                    strokeCap = StrokeCap.Round
-                                )
-                            } else {
-                                LinearProgressIndicator(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(6.dp)
-                                        .clip(RoundedCornerShape(50)),
-                                    color = EmeraldSavings,
-                                    trackColor = Color(0x3364748B),
-                                    strokeCap = StrokeCap.Round
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            TextButton(
-                                onClick = onCancelDownload,
-                                modifier = Modifier.align(Alignment.CenterHorizontally)
-                            ) {
-                                Text(
-                                    text = if (isArabic) "إلغاء التحميل" else "Cancel",
-                                    color = TextMuted,
-                                    fontSize = 12.sp
-                                )
-                            }
-                        }
-                    }
-
-                    is ApkDownloadState.Downloaded,
-                    is ApkDownloadState.RequiresInstallPermission -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(EmeraldSavings.copy(alpha = 0.22f))
-                                .border(BorderStroke(1.2.dp, EmeraldSavings), RoundedCornerShape(12.dp))
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = ripple(bounded = true, color = EmeraldSavings),
-                                    onClick = onInstallApk
-                                )
-                                .padding(horizontal = 14.dp)
-                                .testTag("dialog_update_install_button"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = if (apkDownloadState is ApkDownloadState.RequiresInstallPermission) {
-                                    if (isArabic) "تثبيت التحديث (اسمح بالمصدر)" else "Install Update (Allow Source)"
-                                } else {
-                                    if (isArabic) "تثبيت التحديث الآن" else "Install Update Now"
-                                },
-                                color = EmeraldSavings,
-                                fontSize = 13.5.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    is ApkDownloadState.Failed -> {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            Text(
-                                text = if (isArabic) apkDownloadState.messageAr else apkDownloadState.messageEn,
-                                color = NeonAmber,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(EmeraldSavings.copy(alpha = 0.18f))
-                                    .border(BorderStroke(1.2.dp, EmeraldSavings), RoundedCornerShape(12.dp))
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = ripple(bounded = true, color = EmeraldSavings),
-                                        onClick = { onStartInAppDownload(downloadUrl) }
-                                    )
-                                    .padding(horizontal = 14.dp)
-                                    .testTag("dialog_update_retry_button"),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = if (isArabic) "إعادة التحميل" else "Retry Download",
-                                    color = EmeraldSavings,
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Re-check Button
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(ElectricCyan.copy(alpha = 0.15f))
-                        .border(BorderStroke(1.2.dp, ElectricCyan), RoundedCornerShape(12.dp))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(bounded = true, color = ElectricCyan),
-                            onClick = onCheckNow
-                        )
-                        .padding(horizontal = 14.dp)
-                        .testTag("dialog_update_check_button"),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.SystemUpdate,
-                            contentDescription = null,
-                            tint = ElectricCyan,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (isArabic) "إعادة فحص التحديثات" else "Check Again",
-                            color = ElectricCyan,
-                            fontSize = 13.5.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-        },
-        containerColor = dialogBg,
-        shape = RoundedCornerShape(20.dp)
+        testTag = "open_app_update_button",
+        isLoading = isChecking
     )
 }
 
