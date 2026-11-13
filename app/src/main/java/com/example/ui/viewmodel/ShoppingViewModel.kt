@@ -39,7 +39,8 @@ class ShoppingViewModel(
 
     companion object {
         const val DEVELOPER_NAME = "Charfeddine Ka"
-        const val APP_VERSION = "v1.0 Build 1"
+        val APP_VERSION: String
+            get() = "v${BuildConfig.VERSION_NAME} Build ${BuildConfig.VERSION_CODE}"
         const val LAST_UPDATE_DATE_AR = "09/11/2026"
         const val LAST_UPDATE_DATE_EN = "09/11/2026"
     }

@@ -1469,7 +1469,7 @@ private fun DeveloperInfoSection(
                         .padding(horizontal = 10.dp, vertical = 5.dp)
                 ) {
                     Text(
-                        text = "v1.0",
+                        text = "v${BuildConfig.VERSION_NAME}",
                         color = if (isLight) CyanTintText else ElectricCyan,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold

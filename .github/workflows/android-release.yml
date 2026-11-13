@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -37,59 +43,125 @@ jobs:
             chmod +x gradlew
           fi
 
-      - name: Extract Version Info & Prevent Tag Collision
-        id: extract_version
+      - name: Compute Auto-Incremented Version (1.x.x) & APK Name
+        id: version_info
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
-          VERSION_NAME=$(grep -E '^\s*versionName\s*=\s*' app/build.gradle.kts | head -1 | sed -E 's/.*versionName\s*=\s*"([^"]+)".*/\1/')
-          VERSION_CODE=$(grep -E '^\s*versionCode\s*=\s*' app/build.gradle.kts | head -1 | sed -E 's/.*versionCode\s*=\s*([0-9]+).*/\1/')
-          
-          if [ -z "$VERSION_NAME" ]; then
-            VERSION_NAME="1.0"
-          fi
-          if [ -z "$VERSION_CODE" ]; then
-            VERSION_CODE="1"
-          fi
-          
-          # Prevent duplicate tag collisions if re-running or updating existing version
-          BASE_TAG="v$VERSION_NAME"
-          if git rev-parse -q --verify "refs/tags/$BASE_TAG" >/dev/null 2>&1; then
-            FINAL_TAG="v${VERSION_NAME}-b${VERSION_CODE}.${{ github.run_number }}"
-          else
-            FINAL_TAG="$BASE_TAG"
-          fi
-          
-          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
-          echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
-          echo "TAG_NAME=$FINAL_TAG" >> $GITHUB_ENV
-          echo "Resolved Version: $VERSION_NAME (Build $VERSION_CODE) -> Tag: $FINAL_TAG"
+          python3 - << 'EOF'
+          import json
+          import os
+          import re
+          import subprocess
 
-      - name: Prepare Signing Keystore
+          # 1. Read app_name from strings.xml
+          app_name = "ShopyPulse"
+          strings_path = "app/src/main/res/values/strings.xml"
+          if os.path.exists(strings_path):
+              with open(strings_path, "r", encoding="utf-8") as f:
+                  content = f.read()
+                  m = re.search(r'name="app_name">([^<]+)<', content)
+                  if m:
+                      app_name = m.group(1).strip()
+
+          # Normalize app name cleanly for GitHub Release asset naming
+          app_name_clean = re.sub(r'\s+', '.', app_name)
+
+          # 2. Read base versionCode & versionName from app/build.gradle.kts
+          base_code = 1
+          base_seq = 0
+          gradle_path = "app/build.gradle.kts"
+          if os.path.exists(gradle_path):
+              with open(gradle_path, "r", encoding="utf-8") as f:
+                  g = f.read()
+                  mc = re.search(r'versionCode\s*=\s*.*?(\d+)', g)
+                  if mc:
+                      base_code = int(mc.group(1))
+                  mn = re.search(r'versionName\s*=\s*.*?"([^"]+)"', g)
+                  if mn:
+                      parts = [int(p) for p in re.findall(r'\d+', mn.group(1))]
+                      if len(parts) >= 3 and parts[0] == 1:
+                          base_seq = parts[1] * 100 + parts[2]
+                      elif len(parts) == 2 and parts[0] == 1:
+                          base_seq = parts[1] * 100
+
+          # 3. Inspect existing GitHub Releases & Git tags to guarantee strict increment
+          highest_seq = 0
+          tags = []
+          try:
+              out = subprocess.check_output(
+                  ["gh", "release", "list", "--limit", "50", "--json", "tagName"],
+                  stderr=subprocess.DEVNULL
+              ).decode("utf-8")
+              for rel in json.loads(out):
+                  tags.append(rel.get("tagName", ""))
+          except Exception:
+              pass
+
+          try:
+              git_tags = subprocess.check_output(
+                  ["git", "tag", "--list", "v*"],
+                  stderr=subprocess.DEVNULL
+              ).decode("utf-8").splitlines()
+              tags.extend(git_tags)
+          except Exception:
+              pass
+
+          for tag in tags:
+              m = re.search(r'v?1\.(\d+)\.(\d+)', tag)
+              if m:
+                  seq = int(m.group(1)) * 100 + int(m.group(2))
+                  if seq > highest_seq:
+                      highest_seq = seq
+
+          run_number = int(os.environ.get("RUN_NUMBER", "1"))
+          next_seq = max(highest_seq + 1, base_seq, run_number)
+          next_code = max(base_code, next_seq, run_number)
+
+          minor = next_seq // 100
+          patch = next_seq % 100
+          version_name = f"1.{minor}.{patch}"
+          tag_name = f"v{version_name}"
+          apk_filename = f"{app_name_clean}.{tag_name}.apk"
+
+          env_file = os.environ["GITHUB_ENV"]
+          with open(env_file, "a", encoding="utf-8") as ef:
+              ef.write(f"APP_VERSION_CODE={next_code}\n")
+              ef.write(f"APP_VERSION_NAME={version_name}\n")
+              ef.write(f"TAG_NAME={tag_name}\n")
+              ef.write(f"APK_FILENAME={apk_filename}\n")
+              ef.write(f"APP_DISPLAY_NAME={app_name}\n")
+
+          print(f"Auto-incremented Release -> {apk_filename} | Version: {version_name} (Build {next_code}) | Tag: {tag_name}")
+          EOF
+
+      - name: Prepare Consistent Signing Keystore (Enables Direct In-Place Updates)
         id: prepare_keystore
         run: |
           KEYSTORE_FILE="${{ github.workspace }}/release.jks"
           if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
-            echo "Using repository secret KEYSTORE_BASE64..."
+            echo "Using repository secret KEYSTORE_BASE64 for consistent app signature..."
             echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > "$KEYSTORE_FILE"
             echo "STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
             echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
             echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> $GITHUB_ENV
           elif [ -f "${{ github.workspace }}/my-upload-key.jks" ]; then
-            echo "Using existing repository my-upload-key.jks..."
+            echo "Using committed my-upload-key.jks for consistent app signature..."
             KEYSTORE_FILE="${{ github.workspace }}/my-upload-key.jks"
             echo "STORE_PASSWORD=android" >> $GITHUB_ENV
             echo "KEY_PASSWORD=android" >> $GITHUB_ENV
             echo "KEY_ALIAS=upload" >> $GITHUB_ENV
           else
-            echo "Generating automatic signing key fallback..."
-            keytool -genkeypair -v -keystore "$KEYSTORE_FILE" -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=ShopyPulse, OU=Mobile, O=ShopyPulse, L=Algiers, ST=Algiers, C=DZ"
-            echo "STORE_PASSWORD=android" >> $GITHUB_ENV
-            echo "KEY_PASSWORD=android" >> $GITHUB_ENV
-            echo "KEY_ALIAS=upload" >> $GITHUB_ENV
+            echo "ERROR: No consistent signing keystore found! Add my-upload-key.jks or KEYSTORE_BASE64 secret so updates can install over existing versions."
+            exit 1
           fi
           echo "KEYSTORE_PATH=$KEYSTORE_FILE" >> $GITHUB_ENV
 
       - name: Build Signed Release APK
         env:
+          APP_VERSION_CODE: ${{ env.APP_VERSION_CODE }}
+          APP_VERSION_NAME: ${{ env.APP_VERSION_NAME }}
           KEYSTORE_PATH: ${{ env.KEYSTORE_PATH }}
           STORE_PASSWORD: ${{ env.STORE_PASSWORD }}
           KEY_PASSWORD: ${{ env.KEY_PASSWORD }}
@@ -103,81 +175,81 @@ jobs:
             gradle assembleRelease --no-daemon --stacktrace
           fi
 
-      - name: Prepare Release APK Artifact
+      - name: Rename Release APK to [app_name].v1.x.x.apk
         run: |
           APK_SRC=$(find app/build/outputs/apk/release/ -name "*.apk" | head -1)
-          APK_DEST="ShopyPulse-v${{ env.VERSION_NAME }}.apk"
-          
+          APK_DEST="${{ env.APK_FILENAME }}"
+
           if [ -f "$APK_SRC" ]; then
             cp "$APK_SRC" "$APK_DEST"
-            echo "Successfully prepared: $APK_DEST"
+            echo "Successfully prepared release artifact: $APK_DEST"
+            ls -lh "$APK_DEST"
           else
             echo "ERROR: Release APK not found in app/build/outputs/apk/release/"
             exit 1
           fi
 
-      - name: Create GitHub Release & Upload APK
+      - name: Publish Latest GitHub Release & Upload APK
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG_NAME }}
-          name: "Shopy Pulse v${{ env.VERSION_NAME }} (Build ${{ env.VERSION_CODE }})"
+          name: "${{ env.APP_DISPLAY_NAME }} ${{ env.TAG_NAME }} (Build ${{ env.APP_VERSION_CODE }})"
           make_latest: true
           body: |
-            ### 🚀 Shopy Pulse v${{ env.VERSION_NAME }} Release
-            
+            ### 🚀 ${{ env.APP_DISPLAY_NAME }} ${{ env.TAG_NAME }}
+
             **Build Details:**
-            - **Release Artifact:** `ShopyPulse-v${{ env.VERSION_NAME }}.apk`
-            - **Version Name:** `${{ env.VERSION_NAME }}`
-            - **Version Code:** `${{ env.VERSION_CODE }}`
-            - **Commit SHA:** `${{ github.sha }}`
-            - **Trigger Branch:** `${{ github.ref_name }}`
-            - **Author / Lead:** Developed by Charfeddine Ka
-            
-            **Key Features Included:**
-            - 🛒 Smart Shopping List with auto-categorization & offline Room DB
-            - 📊 Total Basket multi-market price comparison across stores
-            - ⚡ Supermarket Mode with live budget HUD & real-time progress
-            - ⚙️ Settings: Dark/Light Mode, Language switch (Arabic RTL / English LTR), Google Drive backup
-            - 🌬️ Animated Flowing Wind Glow Header for Shopy Pulse
-            
-            #### 📲 Installation & Update Instructions:
-            1. Download the `ShopyPulse-v${{ env.VERSION_NAME }}.apk` file attached below.
-            2. Open the APK on your Android device.
-            3. This release will update directly over your existing installation without losing any shopping lists or data.
-          files: ShopyPulse-v${{ env.VERSION_NAME }}.apk
+            - **APK File:** `${{ env.APK_FILENAME }}`
+            - **Version Name:** `${{ env.APP_VERSION_NAME }}`
+            - **Version Code:** `${{ env.APP_VERSION_CODE }}`
+            - **Commit:** `${{ github.sha }}`
+            - **Branch:** `${{ github.ref_name }}`
+
+            #### 📲 Direct In-Place Update:
+            - Download `${{ env.APK_FILENAME }}` below and install directly over your existing version without uninstalling (all shopping lists, settings, and data are preserved).
+          files: ${{ env.APK_FILENAME }}
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Prune Older Releases (Retain Only The Latest Release)
+      - name: Delete All Older Releases & Tags (Keep Only Latest)
         if: success()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Pruning older releases to keep only the latest release..."
+          echo "Cleaning up older releases and tags..."
           CURRENT_TAG="${{ env.TAG_NAME }}"
           OLD_RELEASES=$(gh release list --limit 100 --json tagName --jq '.[].tagName' | grep -v "^${CURRENT_TAG}$" || true)
           for old_tag in $OLD_RELEASES; do
             if [ -n "$old_tag" ]; then
-              echo "Deleting old release: $old_tag"
-              gh release delete "$old_tag" --cleanup-tag --yes || echo "Could not delete $old_tag, continuing..."
+              echo "Deleting old release & tag: $old_tag"
+              gh release delete "$old_tag" --cleanup-tag --yes || true
             fi
           done
-          echo "Old releases cleaned successfully. Only latest release ($CURRENT_TAG) retained."
 
-      - name: Prune Older Workflow Runs (Retain Only The Latest Action Runs)
+          # Also remove any stray remote git tags other than CURRENT_TAG
+          git fetch --tags --prune || true
+          for tag in $(git tag -l | grep -v "^${CURRENT_TAG}$" || true); do
+            if [ -n "$tag" ]; then
+              echo "Deleting stray remote tag: $tag"
+              git push origin --delete "$tag" 2>/dev/null || true
+            fi
+          done
+          echo "Only latest release ($CURRENT_TAG) remains."
+
+      - name: Clean Up Actions Workflow History (Keep Only Latest Run)
         if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Pruning older completed workflow runs in Actions..."
+          echo "Cleaning up older completed Actions workflow runs..."
           CURRENT_RUN_ID="${{ github.run_id }}"
-          OLD_RUNS=$(gh run list --workflow=android-release.yml --status=completed --json databaseId --jq '.[].databaseId' | grep -v "^${CURRENT_RUN_ID}$" || true)
+          OLD_RUNS=$(gh api "repos/${{ github.repository }}/actions/runs" --paginate --jq ".workflow_runs[] | select(.id != ${CURRENT_RUN_ID} and .status == \"completed\") | .id" || true)
           for run_id in $OLD_RUNS; do
             if [ -n "$run_id" ]; then
               echo "Deleting old workflow run: $run_id"
-              gh run delete "$run_id" || echo "Could not delete run $run_id, continuing..."
+              gh api -X DELETE "repos/${{ github.repository }}/actions/runs/${run_id}" || true
             fi
           done
-          echo "Workflow runs cleanup complete. Only latest run is preserved."
+          echo "Actions history cleaned. Only latest run (${CURRENT_RUN_ID}) retained."
