@@ -1,5 +1,6 @@
 package com.example.ui.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -13,9 +14,11 @@ import com.example.data.model.ShoppingItem
 import com.example.data.model.SpendingRecord
 import com.example.data.model.StoreBasketSummary
 import com.example.data.repository.ShoppingRepository
+import com.example.util.ApkDownloadState
 import com.example.util.AppUpdateChecker
 import com.example.util.AppUpdateStatus
 import com.example.util.LocalizationUtil
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -28,6 +31,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -145,6 +149,10 @@ class ShoppingViewModel(
     private val _showUpdateOverlay = MutableStateFlow(false)
     val showUpdateOverlay: StateFlow<Boolean> = _showUpdateOverlay.asStateFlow()
 
+    private val _apkDownloadState = MutableStateFlow<ApkDownloadState>(ApkDownloadState.Idle)
+    val apkDownloadState: StateFlow<ApkDownloadState> = _apkDownloadState.asStateFlow()
+
+    private var downloadJob: Job? = null
     private var lastAutoCheckAtMs: Long = 0L
 
     private val _lastUpdateCheckTimestamp = MutableStateFlow(initialPrefs.lastUpdateCheckTimestamp)
@@ -152,17 +160,23 @@ class ShoppingViewModel(
 
     fun dismissUpdateOverlay() {
         _showUpdateOverlay.value = false
+        if (_apkDownloadState.value is ApkDownloadState.Failed) {
+            _apkDownloadState.value = ApkDownloadState.Idle
+        }
     }
 
     fun openUpdateOverlayIfAvailable() {
         if (_updateStatus.value is AppUpdateStatus.UpdateAvailable) {
+            if (_apkDownloadState.value is ApkDownloadState.Failed) {
+                _apkDownloadState.value = ApkDownloadState.Idle
+            }
             _showUpdateOverlay.value = true
         }
     }
 
     fun checkForUpdatesOnAppOpen() {
         val now = System.currentTimeMillis()
-        // Prevent duplicate back-to-back check within 5 seconds of app launch or browser return
+        // Prevent duplicate back-to-back check within 5 seconds of app launch or permission return
         if (now - lastAutoCheckAtMs < 5_000L) return
         checkForUpdates(autoOpenOverlay = true)
     }
@@ -171,6 +185,9 @@ class ShoppingViewModel(
         if (_updateStatus.value is AppUpdateStatus.Checking) return
         lastAutoCheckAtMs = System.currentTimeMillis()
         _updateStatus.value = AppUpdateStatus.Checking
+        if (_apkDownloadState.value is ApkDownloadState.Failed) {
+            _apkDownloadState.value = ApkDownloadState.Idle
+        }
         viewModelScope.launch {
             val result = AppUpdateChecker.checkForUpdate(BuildConfig.VERSION_NAME)
             _updateStatus.value = result
@@ -183,6 +200,52 @@ class ShoppingViewModel(
                     _showUpdateOverlay.value = true
                 }
             }
+        }
+    }
+
+    fun startInAppUpdateDownload(
+        context: Context,
+        url: String = getUpdateUrl(),
+        versionLabel: String = getLatestVersionLabel()
+    ) {
+        if (_apkDownloadState.value is ApkDownloadState.Downloading) return
+        val appContext = context.applicationContext
+        downloadJob?.cancel()
+        downloadJob = viewModelScope.launch {
+            AppUpdateChecker.downloadApkInApp(appContext, url, versionLabel).collect { state ->
+                _apkDownloadState.value = state
+                if (state is ApkDownloadState.Downloaded) {
+                    installDownloadedApk(appContext, state.apkFile)
+                }
+            }
+        }
+    }
+
+    fun installDownloadedApk(context: Context, file: File? = null) {
+        val targetFile = file ?: when (val st = _apkDownloadState.value) {
+            is ApkDownloadState.Downloaded -> st.apkFile
+            is ApkDownloadState.RequiresInstallPermission -> st.apkFile
+            else -> null
+        } ?: return
+
+        val launched = AppUpdateChecker.triggerApkInstall(context.applicationContext, targetFile)
+        _apkDownloadState.value = if (launched) {
+            ApkDownloadState.Downloaded(targetFile)
+        } else {
+            ApkDownloadState.RequiresInstallPermission(targetFile)
+        }
+    }
+
+    fun cancelUpdateDownload() {
+        downloadJob?.cancel()
+        downloadJob = null
+        _apkDownloadState.value = ApkDownloadState.Idle
+    }
+
+    private fun getLatestVersionLabel(): String {
+        return when (val st = _updateStatus.value) {
+            is AppUpdateStatus.UpdateAvailable -> st.latestVersion
+            else -> "latest"
         }
     }
 

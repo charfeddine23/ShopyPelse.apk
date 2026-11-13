@@ -2,8 +2,10 @@ package com.example
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import com.example.ui.BaseActivity
+import com.example.util.ApkDownloadState
 import com.example.util.LocaleHelper
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -155,6 +157,16 @@ class MainActivity : BaseActivity() {
             viewModel.checkForUpdatesOnAppOpen()
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        if (::viewModel.isInitialized &&
+            viewModel.apkDownloadState.value is ApkDownloadState.RequiresInstallPermission &&
+            (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || packageManager.canRequestPackageInstalls())
+        ) {
+            viewModel.installDownloadedApk(this)
+        }
+    }
 }
 
 @Composable
@@ -169,6 +181,7 @@ fun ShopyPulseApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
     val isLiquidDockSwipeEnabled by viewModel.isLiquidDockSwipeEnabled.collectAsStateWithLifecycle()
     val updateStatus by viewModel.updateStatus.collectAsStateWithLifecycle()
     val showUpdateOverlay by viewModel.showUpdateOverlay.collectAsStateWithLifecycle()
+    val apkDownloadState by viewModel.apkDownloadState.collectAsStateWithLifecycle()
 
     // Handle back button when on sub-screens
     BackHandler(enabled = currentScreen != Screen.HOME) {
@@ -249,19 +262,29 @@ fun ShopyPulseApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
             )
         }
 
-        // Full-Screen In-App Update Overlay (shown automatically when a newer update is detected)
+        // Compact Luxury In-App Update Card (shown automatically when a newer update is detected)
         val availableUpdate = updateStatus as? AppUpdateStatus.UpdateAvailable
         AnimatedVisibility(
             visible = showUpdateOverlay && availableUpdate != null,
-            enter = fadeIn(tween(240)) + scaleIn(initialScale = 0.96f, animationSpec = tween(240)),
-            exit = fadeOut(tween(180))
+            enter = fadeIn(tween(220)) + scaleIn(initialScale = 0.92f, animationSpec = tween(220)),
+            exit = fadeOut(tween(170))
         ) {
             if (availableUpdate != null) {
                 AppUpdateOverlay(
                     updateInfo = availableUpdate,
+                    apkDownloadState = apkDownloadState,
                     isArabic = isArabic,
                     onDismiss = { viewModel.dismissUpdateOverlay() },
                     onUpdateClick = { url ->
+                        viewModel.startInAppUpdateDownload(
+                            context = context,
+                            url = url,
+                            versionLabel = availableUpdate.latestVersion
+                        )
+                    },
+                    onInstallClick = { viewModel.installDownloadedApk(context) },
+                    onCancelDownload = { viewModel.cancelUpdateDownload() },
+                    onFallbackBrowser = { url ->
                         try {
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
