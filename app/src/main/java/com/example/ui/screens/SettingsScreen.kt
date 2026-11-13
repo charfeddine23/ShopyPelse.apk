@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -643,7 +644,7 @@ private fun DynamicGlowToggleSection(
 }
 
 /**
- * 2c. Liquid Glass Dock Swipe Effect Toggle Section
+ * 2c. Interactive Fluid Water Physics Effect Toggle Section
  */
 @Composable
 private fun LiquidDockSwipeToggleSection(
@@ -655,7 +656,7 @@ private fun LiquidDockSwipeToggleSection(
 
     NeumorphicGlassCard(
         modifier = Modifier.fillMaxWidth(),
-        glowColor = if (isEnabled) EmeraldSavings.copy(alpha = 0.30f) else Color.Transparent
+        glowColor = if (isEnabled) ElectricCyan.copy(alpha = 0.30f) else Color.Transparent
     ) {
         Row(
             modifier = Modifier
@@ -672,13 +673,13 @@ private fun LiquidDockSwipeToggleSection(
                     modifier = Modifier
                         .size(32.dp)
                         .clip(RoundedCornerShape(9.dp))
-                        .background(if (isEnabled) EmeraldSavings.copy(alpha = 0.15f) else Color(0x18777777)),
+                        .background(if (isEnabled) ElectricCyan.copy(alpha = 0.15f) else Color(0x18777777)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.CompareArrows,
+                        imageVector = Icons.Default.WaterDrop,
                         contentDescription = null,
-                        tint = if (isEnabled) EmeraldSavings else TextSecondary,
+                        tint = if (isEnabled) ElectricCyan else TextSecondary,
                         modifier = Modifier.size(17.dp)
                     )
                 }
@@ -687,14 +688,14 @@ private fun LiquidDockSwipeToggleSection(
 
                 Column {
                     Text(
-                        text = if (isArabic) "تمرير الدوك بالزجاج السائل" else "Liquid Glass Dock Swipe",
+                        text = if (isArabic) "فيزياء المياه التفاعلية" else "Fluid Water Touch Physics",
                         color = TextPrimary,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = if (isArabic) "فقاعة وقطرة ذيل للتنقل بين الصفحات" else "Fluid droplet gesture navigation",
-                        color = if (isEnabled) EmeraldSavings else TextSecondary,
+                        text = if (isArabic) "تموجات وانعكاس المياه عند اللمس والتمرير" else "Real-time water ripples & touch waves",
+                        color = if (isEnabled) ElectricCyan else TextSecondary,
                         fontSize = 11.sp
                     )
                 }
@@ -703,10 +704,10 @@ private fun LiquidDockSwipeToggleSection(
             NeumorphicGlowingSwitch(
                 checked = isEnabled,
                 onCheckedChange = onToggleChange,
-                activeColor = EmeraldSavings,
+                activeColor = ElectricCyan,
                 inactiveColor = if (isLight) Color(0xFFCBD5E1) else Color(0xFF475569),
-                checkedIcon = Icons.AutoMirrored.Filled.CompareArrows,
-                uncheckedIcon = Icons.AutoMirrored.Filled.CompareArrows,
+                checkedIcon = Icons.Default.WaterDrop,
+                uncheckedIcon = Icons.Default.WaterDrop,
                 modifier = Modifier.testTag("liquid_dock_swipe_switch")
             )
         }

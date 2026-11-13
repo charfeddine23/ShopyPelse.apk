@@ -75,4 +75,44 @@ class ExampleRobolectricTest {
     assertEquals(8200.0, dsState.budgetLimitDzd, 0.01)
     assertEquals("SETTINGS", dsState.currentScreen)
   }
+
+  @Test
+  fun `fluid water physics propagates waves and settles cleanly under viscous friction`() {
+    val waterState = com.example.ui.components.FluidWaterState(densityPx = 3f)
+    assertFalse(waterState.isSimulating)
+    assertFalse(waterState.hasActiveDisturbance)
+
+    // 1. Touch down spawns initial capillary wave
+    val pointerId = androidx.compose.ui.input.pointer.PointerId(0L)
+    var nowNanos = 1_000_000_000L
+    waterState.onPointerDown(
+      pointerId = pointerId,
+      position = androidx.compose.ui.geometry.Offset(200f, 400f),
+      eventTimeNanos = nowNanos
+    )
+    assertTrue(waterState.isSimulating)
+    assertTrue(waterState.hasActiveDisturbance)
+
+    // 2. Drag horizontally and vertically to build fluid wake momentum
+    nowNanos += 50_000_000L
+    waterState.onPointerMove(
+      pointerId = pointerId,
+      position = androidx.compose.ui.geometry.Offset(380f, 520f),
+      eventTimeNanos = nowNanos
+    )
+    assertTrue(waterState.wakeEnergy > 0.2f)
+
+    // 3. Release finger and simulate 2.5 seconds at 60 FPS
+    waterState.onPointerUp(
+      pointerId = pointerId,
+      position = androidx.compose.ui.geometry.Offset(420f, 540f)
+    )
+    repeat(150) {
+      waterState.stepPhysics(1f / 60f)
+    }
+
+    // After waves propagate and attenuate via fluid friction, engine rests at 0% idle cost
+    assertFalse(waterState.isSimulating)
+    assertFalse(waterState.hasActiveDisturbance)
+  }
 }
