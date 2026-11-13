@@ -41,6 +41,8 @@ import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Person
@@ -123,6 +125,7 @@ fun SettingsScreen(
     val lastBackupDate by viewModel.lastBackupDate.collectAsStateWithLifecycle()
     val isDynamicGlowEnabled by viewModel.isDynamicGlowEnabled.collectAsStateWithLifecycle()
     val isLiquidDockSwipeEnabled by viewModel.isLiquidDockSwipeEnabled.collectAsStateWithLifecycle()
+    val isFullScreenEnabled by viewModel.isFullScreenEnabled.collectAsStateWithLifecycle()
     val updateStatus by viewModel.updateStatus.collectAsStateWithLifecycle()
     val apkDownloadState by viewModel.apkDownloadState.collectAsStateWithLifecycle()
 
@@ -226,6 +229,17 @@ fun SettingsScreen(
                     isArabic = isArabic,
                     onToggleChange = { enabled ->
                         viewModel.setLiquidDockSwipeEnabled(enabled)
+                    }
+                )
+            }
+
+            // 2d. Full Screen Mode Toggle (Hide Top Phone Status Bar)
+            item {
+                FullScreenToggleSection(
+                    isEnabled = isFullScreenEnabled,
+                    isArabic = isArabic,
+                    onToggleChange = { enabled ->
+                        viewModel.setFullScreenEnabled(enabled)
                     }
                 )
             }
@@ -677,6 +691,77 @@ private fun LiquidDockSwipeToggleSection(
 }
 
 /**
+ * 2d. Full Screen Mode Toggle Section (hides the phone's top status bar completely)
+ */
+@Composable
+private fun FullScreenToggleSection(
+    isEnabled: Boolean,
+    isArabic: Boolean,
+    onToggleChange: (Boolean) -> Unit
+) {
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+
+    NeumorphicGlassCard(
+        modifier = Modifier.fillMaxWidth(),
+        glowColor = if (isEnabled) ElectricCyan.copy(alpha = 0.30f) else Color.Transparent
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 11.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(if (isEnabled) ElectricCyan.copy(alpha = 0.15f) else Color(0x18777777)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isEnabled) Icons.Default.Fullscreen else Icons.Default.FullscreenExit,
+                        contentDescription = null,
+                        tint = if (isEnabled) ElectricCyan else TextSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Column {
+                    Text(
+                        text = if (isArabic) "وضع ملء الشاشة" else "Full Screen Mode",
+                        color = TextPrimary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = if (isArabic) "إخفاء شريط الهاتف العلوي بالكامل" else "Hide top status bar completely",
+                        color = if (isEnabled) ElectricCyan else TextSecondary,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+
+            NeumorphicGlowingSwitch(
+                checked = isEnabled,
+                onCheckedChange = onToggleChange,
+                activeColor = ElectricCyan,
+                inactiveColor = if (isLight) Color(0xFFCBD5E1) else Color(0xFF475569),
+                checkedIcon = Icons.Default.Fullscreen,
+                uncheckedIcon = Icons.Default.FullscreenExit,
+                modifier = Modifier.testTag("full_screen_switch")
+            )
+        }
+    }
+}
+
+/**
  * Custom Neumorphic Switch Toggle with Animated Glowing Active States
  */
 @Composable
@@ -1070,8 +1155,8 @@ private fun AppUpdateSection(
             isChecking -> "Checking..."
             hasUpdate && isArabic -> "تحديث جديد متاح ($cleanVersion)"
             hasUpdate -> "New Update Available ($cleanVersion)"
-            isArabic -> "لايوجد تحديثات"
-            else -> "No updates available"
+            isArabic -> "التطبيق محدث الى اخر نسخة"
+            else -> "App is up to date"
         }
     }
 

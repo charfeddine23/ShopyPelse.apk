@@ -2,11 +2,15 @@ package com.example
 
 import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import com.example.ui.BaseActivity
 import com.example.util.ApkDownloadState
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -26,9 +30,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -124,6 +131,7 @@ class MainActivity : BaseActivity() {
         setContent {
             val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
             val isArabic by viewModel.isArabic.collectAsStateWithLifecycle()
+            val isFullScreen by viewModel.isFullScreenEnabled.collectAsStateWithLifecycle()
 
             // Dynamic Layout Direction: RTL (من اليمين لليسار) for Arabic, LTR for English
             val currentLayoutDirection = if (isArabic) LayoutDirection.Rtl else LayoutDirection.Ltr
@@ -137,11 +145,45 @@ class MainActivity : BaseActivity() {
                 }
             }
 
+            // Hide or show the phone's top status bar dynamically when Full Screen mode toggles
+            LaunchedEffect(isFullScreen) {
+                applyFullScreenStatusBar(isFullScreen)
+            }
+
             ShopyPulseTheme(darkTheme = isDarkMode) {
                 CompositionLocalProvider(LocalLayoutDirection provides currentLayoutDirection) {
-                    ShopyPulseApp(viewModel = viewModel, isDarkMode = isDarkMode)
+                    ShopyPulseApp(
+                        viewModel = viewModel,
+                        isDarkMode = isDarkMode,
+                        isFullScreen = isFullScreen
+                    )
                 }
             }
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && ::viewModel.isInitialized) {
+            applyFullScreenStatusBar(viewModel.isFullScreenEnabled.value)
+        }
+    }
+
+    private fun applyFullScreenStatusBar(enabled: Boolean) {
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        if (enabled) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val lp = window.attributes
+                if (lp.layoutInDisplayCutoutMode != WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES) {
+                    lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    window.attributes = lp
+                }
+            }
+            controller.hide(WindowInsetsCompat.Type.statusBars())
+        } else {
+            controller.show(WindowInsetsCompat.Type.statusBars())
         }
     }
 
@@ -154,17 +196,23 @@ class MainActivity : BaseActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (::viewModel.isInitialized &&
-            viewModel.apkDownloadState.value is ApkDownloadState.RequiresInstallPermission &&
-            (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || packageManager.canRequestPackageInstalls())
-        ) {
-            viewModel.installDownloadedApk(this)
+        if (::viewModel.isInitialized) {
+            applyFullScreenStatusBar(viewModel.isFullScreenEnabled.value)
+            if (viewModel.apkDownloadState.value is ApkDownloadState.RequiresInstallPermission &&
+                (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || packageManager.canRequestPackageInstalls())
+            ) {
+                viewModel.installDownloadedApk(this)
+            }
         }
     }
 }
 
 @Composable
-fun ShopyPulseApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
+fun ShopyPulseApp(
+    viewModel: ShoppingViewModel,
+    isDarkMode: Boolean = true,
+    isFullScreen: Boolean = false
+) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val currentScreenName by viewModel.currentScreenName.collectAsStateWithLifecycle()
@@ -244,6 +292,7 @@ fun ShopyPulseApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
     LiquidGlassBackground(isDarkMode = isDarkMode) {
         Scaffold(
             containerColor = Color.Transparent,
+            contentWindowInsets = WindowInsets.navigationBars,
             bottomBar = {
                 if (currentScreen != Screen.SUPERMARKET) {
                     val activeDockScreen = pagerScreens.getOrNull(pagerState.currentPage) ?: currentScreen
@@ -272,7 +321,13 @@ fun ShopyPulseApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
             },
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
+                .then(
+                    if (isFullScreen) {
+                        Modifier.displayCutoutPadding()
+                    } else {
+                        Modifier.statusBarsPadding()
+                    }
+                )
         ) { innerPadding ->
                 Box(
                     modifier = Modifier

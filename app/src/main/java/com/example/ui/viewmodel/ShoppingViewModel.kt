@@ -143,6 +143,16 @@ class ShoppingViewModel(
         }
     }
 
+    private val _isFullScreenEnabled = MutableStateFlow(initialPrefs.isFullScreenEnabled)
+    val isFullScreenEnabled: StateFlow<Boolean> = _isFullScreenEnabled.asStateFlow()
+
+    fun setFullScreenEnabled(enabled: Boolean) {
+        _isFullScreenEnabled.value = enabled
+        viewModelScope.launch {
+            preferencesStorage.setFullScreenEnabled(enabled)
+        }
+    }
+
     private val _updateStatus = MutableStateFlow<AppUpdateStatus>(AppUpdateStatus.Idle)
     val updateStatus: StateFlow<AppUpdateStatus> = _updateStatus.asStateFlow()
 
