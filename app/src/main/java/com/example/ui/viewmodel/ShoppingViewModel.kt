@@ -141,11 +141,34 @@ class ShoppingViewModel(
     private val _updateStatus = MutableStateFlow<AppUpdateStatus>(AppUpdateStatus.Idle)
     val updateStatus: StateFlow<AppUpdateStatus> = _updateStatus.asStateFlow()
 
+    private val _showUpdateOverlay = MutableStateFlow(false)
+    val showUpdateOverlay: StateFlow<Boolean> = _showUpdateOverlay.asStateFlow()
+
+    private var lastAutoCheckAtMs: Long = 0L
+
     private val _lastUpdateCheckTimestamp = MutableStateFlow(initialPrefs.lastUpdateCheckTimestamp)
     val lastUpdateCheckTimestamp: StateFlow<Long> = _lastUpdateCheckTimestamp.asStateFlow()
 
-    fun checkForUpdates() {
+    fun dismissUpdateOverlay() {
+        _showUpdateOverlay.value = false
+    }
+
+    fun openUpdateOverlayIfAvailable() {
+        if (_updateStatus.value is AppUpdateStatus.UpdateAvailable) {
+            _showUpdateOverlay.value = true
+        }
+    }
+
+    fun checkForUpdatesOnAppOpen() {
+        val now = System.currentTimeMillis()
+        // Prevent duplicate back-to-back check within 5 seconds of app launch or browser return
+        if (now - lastAutoCheckAtMs < 5_000L) return
+        checkForUpdates(autoOpenOverlay = true)
+    }
+
+    fun checkForUpdates(autoOpenOverlay: Boolean = true) {
         if (_updateStatus.value is AppUpdateStatus.Checking) return
+        lastAutoCheckAtMs = System.currentTimeMillis()
         _updateStatus.value = AppUpdateStatus.Checking
         viewModelScope.launch {
             val result = AppUpdateChecker.checkForUpdate(BuildConfig.VERSION_NAME)
@@ -155,6 +178,9 @@ class ShoppingViewModel(
             preferencesStorage.setLastUpdateCheckTimestamp(now)
             if (result is AppUpdateStatus.UpdateAvailable) {
                 preferencesStorage.setLatestKnownVersion(result.latestVersion)
+                if (autoOpenOverlay) {
+                    _showUpdateOverlay.value = true
+                }
             }
         }
     }
@@ -178,6 +204,9 @@ class ShoppingViewModel(
                 preferencesStorage.setLastPriceSyncTimestamp(_lastPriceSyncTimestamp.value)
             }
         }
+
+        // Automatically check for app updates on every launch
+        checkForUpdates(autoOpenOverlay = true)
 
         // Recompute basket comparison whenever shopping items or market prices change
         viewModelScope.launch {

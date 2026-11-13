@@ -114,7 +114,51 @@ object AppUpdateChecker {
             }
         }
 
-        // 2. Fallback: Probe the direct update URL via HEAD request to confirm availability
+        // 2. Fallback: Check GitHub Tags API in case tags are pushed without formal GitHub Releases
+        val tagApiEndpoints = listOf(
+            "https://api.github.com/repos/charfeddine23/ShopyPelse.apk/tags",
+            "https://api.github.com/repos/charfeddine23/ShopyPelse/tags"
+        )
+        for (tagUrl in tagApiEndpoints) {
+            try {
+                val tagReq = Request.Builder()
+                    .url(tagUrl)
+                    .header("Accept", "application/vnd.github+json")
+                    .header("User-Agent", "ShopyPulse-Android")
+                    .build()
+
+                client.newCall(tagReq).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val bodyStr = response.body?.string()
+                        if (!bodyStr.isNullOrBlank() && bodyStr.trim().startsWith("[")) {
+                            val tagsArray = org.json.JSONArray(bodyStr)
+                            if (tagsArray.length() > 0) {
+                                val latestTag = tagsArray.getJSONObject(0).optString("name", "").trim()
+                                if (latestTag.isNotBlank()) {
+                                    return@withContext if (isNewerVersion(latestTag, currentVersionName)) {
+                                        AppUpdateStatus.UpdateAvailable(
+                                            currentVersion = currentVersionName,
+                                            latestVersion = latestTag,
+                                            releaseNotes = "",
+                                            downloadUrl = UPDATE_URL
+                                        )
+                                    } else {
+                                        AppUpdateStatus.UpToDate(
+                                            currentVersion = currentVersionName,
+                                            directUrl = UPDATE_URL
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                // Continue to direct URL probe
+            }
+        }
+
+        // 3. Fallback: Probe the direct update URL via HEAD request to confirm availability
         try {
             val headReq = Request.Builder()
                 .url(UPDATE_URL)

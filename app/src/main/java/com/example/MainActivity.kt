@@ -1,5 +1,7 @@
 package com.example
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import com.example.ui.BaseActivity
 import com.example.util.LocaleHelper
@@ -7,10 +9,12 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -65,6 +69,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import kotlinx.coroutines.launch
@@ -80,8 +85,10 @@ import androidx.lifecycle.lifecycleScope
 import com.example.data.local.AppDatabase
 import com.example.data.local.UserPreferencesRepository
 import com.example.data.repository.ShoppingRepository
+import com.example.ui.components.AppUpdateOverlay
 import com.example.ui.components.LiquidGlassBackground
 import com.example.ui.components.QrShareDialog
+import com.example.util.AppUpdateStatus
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.PriceComparisonScreen
 import com.example.ui.screens.StatisticsScreen
@@ -141,10 +148,18 @@ class MainActivity : BaseActivity() {
             }
         }
     }
+
+    override fun onStart() {
+        super.onStart()
+        if (::viewModel.isInitialized) {
+            viewModel.checkForUpdatesOnAppOpen()
+        }
+    }
 }
 
 @Composable
 fun ShopyPulseApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
+    val context = LocalContext.current
     val currentScreenName by viewModel.currentScreenName.collectAsStateWithLifecycle()
     val currentScreen = remember(currentScreenName) {
         Screen.entries.firstOrNull { it.name == currentScreenName } ?: Screen.HOME
@@ -152,6 +167,8 @@ fun ShopyPulseApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
     var showQrShareDialog by remember { mutableStateOf(false) }
     val isArabic by viewModel.isArabic.collectAsStateWithLifecycle()
     val isLiquidDockSwipeEnabled by viewModel.isLiquidDockSwipeEnabled.collectAsStateWithLifecycle()
+    val updateStatus by viewModel.updateStatus.collectAsStateWithLifecycle()
+    val showUpdateOverlay by viewModel.showUpdateOverlay.collectAsStateWithLifecycle()
 
     // Handle back button when on sub-screens
     BackHandler(enabled = currentScreen != Screen.HOME) {
@@ -230,6 +247,32 @@ fun ShopyPulseApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
                     viewModel.importListFromQr(payload)
                 }
             )
+        }
+
+        // Full-Screen In-App Update Overlay (shown automatically when a newer update is detected)
+        val availableUpdate = updateStatus as? AppUpdateStatus.UpdateAvailable
+        AnimatedVisibility(
+            visible = showUpdateOverlay && availableUpdate != null,
+            enter = fadeIn(tween(240)) + scaleIn(initialScale = 0.96f, animationSpec = tween(240)),
+            exit = fadeOut(tween(180))
+        ) {
+            if (availableUpdate != null) {
+                AppUpdateOverlay(
+                    updateInfo = availableUpdate,
+                    isArabic = isArabic,
+                    onDismiss = { viewModel.dismissUpdateOverlay() },
+                    onUpdateClick = { url ->
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                )
+            }
         }
     }
 }

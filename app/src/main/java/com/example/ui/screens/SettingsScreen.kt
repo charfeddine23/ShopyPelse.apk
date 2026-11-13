@@ -60,6 +60,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -262,8 +263,12 @@ fun SettingsScreen(
                     isArabic = isArabic,
                     updateStatus = updateStatus,
                     onOpenUpdate = {
-                        showUpdateDialog = true
-                        viewModel.checkForUpdates()
+                        if (updateStatus is AppUpdateStatus.UpdateAvailable) {
+                            viewModel.openUpdateOverlayIfAvailable()
+                        } else {
+                            showUpdateDialog = true
+                            viewModel.checkForUpdates(autoOpenOverlay = true)
+                        }
                     }
                 )
             }
@@ -307,6 +312,13 @@ fun SettingsScreen(
                     openDocLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
                 }
             )
+        }
+
+        // Dismiss status dialog automatically when an update is found so AppUpdateOverlay shows cleanly
+        LaunchedEffect(updateStatus, showUpdateDialog) {
+            if (showUpdateDialog && updateStatus is AppUpdateStatus.UpdateAvailable) {
+                showUpdateDialog = false
+            }
         }
 
         // In-App Update Dialog
