@@ -100,6 +100,6 @@ object LocaleHelper {
     fun persistLanguage(context: Context, language: String) {
         val preferences: SharedPreferences =
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        preferences.edit().putString(KEY_LANGUAGE, language).apply()
+        preferences.edit().putString(KEY_LANGUAGE, language).commit()
     }
 }

@@ -105,14 +105,20 @@ fun StatisticsScreen(
     var showManualAddDialog by remember { mutableStateOf(false) }
     var recordToDelete by remember { mutableStateOf<SpendingRecord?>(null) }
 
+    val savedStatsMonth by viewModel.selectedStatsMonth.collectAsStateWithLifecycle()
+
     // Dynamic distinct month keys
     val availableMonths = remember(spendingRecords) {
         val keys = spendingRecords.map { it.monthKey }.distinct().sortedDescending()
         if (keys.isEmpty()) listOf("2026-11") else keys
     }
 
-    var selectedMonth by remember(availableMonths) {
-        mutableStateOf(availableMonths.firstOrNull() ?: "2026-11")
+    val selectedMonth = remember(savedStatsMonth, availableMonths) {
+        if (savedStatsMonth == "ALL" || availableMonths.contains(savedStatsMonth)) {
+            savedStatsMonth
+        } else {
+            availableMonths.firstOrNull() ?: "2026-11"
+        }
     }
 
     val filteredRecords = remember(spendingRecords, selectedMonth) {
@@ -263,7 +269,7 @@ fun StatisticsScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(pillBg)
                                 .border(pillBorder, RoundedCornerShape(12.dp))
-                                .clickable { selectedMonth = mKey }
+                                .clickable { viewModel.setSelectedStatsMonth(mKey) }
                                 .padding(horizontal = 14.dp, vertical = 7.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {

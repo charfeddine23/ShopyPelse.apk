@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -47,9 +48,11 @@ import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -96,9 +99,15 @@ import com.example.ui.theme.PeachTintText
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import com.example.BuildConfig
 import com.example.ui.viewmodel.ShoppingViewModel
+import com.example.util.AppUpdateChecker
+import com.example.util.AppUpdateStatus
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Production-ready Settings Screen for 'Shopy Pulse' matching the Dark Slate
@@ -118,10 +127,13 @@ fun SettingsScreen(
     val lastBackupDate by viewModel.lastBackupDate.collectAsStateWithLifecycle()
     val isDynamicGlowEnabled by viewModel.isDynamicGlowEnabled.collectAsStateWithLifecycle()
     val isLiquidDockSwipeEnabled by viewModel.isLiquidDockSwipeEnabled.collectAsStateWithLifecycle()
+    val updateStatus by viewModel.updateStatus.collectAsStateWithLifecycle()
+    val lastUpdateCheckTimestamp by viewModel.lastUpdateCheckTimestamp.collectAsStateWithLifecycle()
 
     var showQrDialog by remember { mutableStateOf(false) }
     var qrDialogInitialMode by remember { mutableStateOf(false) }
     var showDriveDialog by remember { mutableStateOf(false) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
 
     // Circular Reveal animation states for Light/Dark mode transition
     var revealTargetDark by remember { mutableStateOf<Boolean?>(null) }
@@ -244,6 +256,18 @@ fun SettingsScreen(
                 )
             }
 
+            // 4b. In-App Update Section
+            item {
+                AppUpdateSection(
+                    isArabic = isArabic,
+                    updateStatus = updateStatus,
+                    onOpenUpdate = {
+                        showUpdateDialog = true
+                        viewModel.checkForUpdates()
+                    }
+                )
+            }
+
             // 5. App & Developer Info Section ("Developed by Kahlessenane Charfeddine")
             item {
                 DeveloperInfoSection(
@@ -281,6 +305,27 @@ fun SettingsScreen(
                 },
                 onRestore = {
                     openDocLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+                }
+            )
+        }
+
+        // In-App Update Dialog
+        if (showUpdateDialog) {
+            AppUpdateDialog(
+                isArabic = isArabic,
+                updateStatus = updateStatus,
+                lastCheckTimestamp = lastUpdateCheckTimestamp,
+                onDismiss = { showUpdateDialog = false },
+                onCheckNow = { viewModel.checkForUpdates() },
+                onOpenDownloadUrl = { url ->
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
             )
         }
@@ -984,6 +1029,311 @@ private fun GoogleDriveDialog(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = if (isArabic) "استعادة نسخة سابقة" else "Restore from Drive",
+                            color = ElectricCyan,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        },
+        containerColor = dialogBg,
+        shape = RoundedCornerShape(20.dp)
+    )
+}
+
+/**
+ * 4b. In-App Update Section
+ */
+@Composable
+private fun AppUpdateSection(
+    isArabic: Boolean,
+    updateStatus: AppUpdateStatus,
+    onOpenUpdate: () -> Unit
+) {
+    val hasUpdate = updateStatus is AppUpdateStatus.UpdateAvailable
+    val title = when {
+        hasUpdate && isArabic -> "تحديث جديد متاح (${(updateStatus as AppUpdateStatus.UpdateAvailable).latestVersion})"
+        hasUpdate -> "New Update Available (${(updateStatus as AppUpdateStatus.UpdateAvailable).latestVersion})"
+        isArabic -> "تحديث التطبيق"
+        else -> "App Updates"
+    }
+    SingleActionNavButton(
+        icon = Icons.Default.SystemUpdate,
+        title = title,
+        accentColor = if (hasUpdate) NeonAmber else EmeraldSavings,
+        onClick = onOpenUpdate,
+        testTag = "open_app_update_button"
+    )
+}
+
+/**
+ * Dedicated In-App Update Dialog (checks GitHub release & opens update link safely via ACTION_VIEW)
+ */
+@Composable
+private fun AppUpdateDialog(
+    isArabic: Boolean,
+    updateStatus: AppUpdateStatus,
+    lastCheckTimestamp: Long,
+    onDismiss: () -> Unit,
+    onCheckNow: () -> Unit,
+    onOpenDownloadUrl: (String) -> Unit
+) {
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+    val dialogBg = if (isLight) Color(0xFFF8FAFC) else Color(0xFF0F172A)
+    val accentColor = if (updateStatus is AppUpdateStatus.UpdateAvailable) NeonAmber else EmeraldSavings
+
+    val downloadUrl = when (updateStatus) {
+        is AppUpdateStatus.UpdateAvailable -> updateStatus.downloadUrl
+        is AppUpdateStatus.ReadyDirectLink -> updateStatus.downloadUrl
+        is AppUpdateStatus.UpToDate -> updateStatus.directUrl
+        is AppUpdateStatus.Error -> updateStatus.fallbackUrl
+        else -> AppUpdateChecker.UPDATE_URL
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = if (isArabic) "إغلاق" else "Close",
+                    color = ElectricCyan,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(accentColor.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SystemUpdate,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = if (isArabic) "تحديث التطبيق" else "App Updates",
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp
+                )
+            }
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // Current Installed Version
+                Text(
+                    text = if (isArabic) {
+                        "الإصدار الحالي: v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})"
+                    } else {
+                        "Current Version: v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})"
+                    },
+                    color = TextSecondary,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Medium
+                )
+
+                if (lastCheckTimestamp > 0L) {
+                    val formatted = remember(lastCheckTimestamp) {
+                        SimpleDateFormat("dd/MM/yyyy - HH:mm", Locale.getDefault()).format(Date(lastCheckTimestamp))
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = if (isArabic) "آخر فحص: $formatted" else "Last checked: $formatted",
+                        color = TextMuted,
+                        fontSize = 11.5.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Status Card
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isLight) Color.White else Color(0x221E293B))
+                        .border(
+                            BorderStroke(1.dp, accentColor.copy(alpha = 0.35f)),
+                            RoundedCornerShape(12.dp)
+                        )
+                        .padding(12.dp)
+                ) {
+                    when (updateStatus) {
+                        is AppUpdateStatus.Checking -> {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    color = ElectricCyan,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = if (isArabic) "جاري التحقق من التحديثات..." else "Checking for updates...",
+                                    color = ElectricCyan,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
+                        is AppUpdateStatus.UpdateAvailable -> {
+                            Column {
+                                Text(
+                                    text = if (isArabic) {
+                                        "يتوفر إصدار جديد: ${updateStatus.latestVersion}"
+                                    } else {
+                                        "New version available: ${updateStatus.latestVersion}"
+                                    },
+                                    color = NeonAmber,
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                if (updateStatus.releaseNotes.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = updateStatus.releaseNotes,
+                                        color = TextSecondary,
+                                        fontSize = 12.sp,
+                                        maxLines = 4,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+
+                        is AppUpdateStatus.UpToDate -> {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = EmeraldSavings,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isArabic) "لديك أحدث إصدار من التطبيق" else "You are on the latest version",
+                                    color = EmeraldSavings,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
+                        is AppUpdateStatus.ReadyDirectLink -> {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = EmeraldSavings,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isArabic) {
+                                        "رابط التحديث المباشر جاهز للتنزيل"
+                                    } else {
+                                        "Direct update package link is ready"
+                                    },
+                                    color = EmeraldSavings,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
+                        is AppUpdateStatus.Error -> {
+                            Text(
+                                text = if (isArabic) updateStatus.messageAr else updateStatus.messageEn,
+                                color = NeonAmber,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+
+                        is AppUpdateStatus.Idle -> {
+                            Text(
+                                text = if (isArabic) "اضغط فحص التحديثات للتحقق من توفر نسخة أحدث" else "Tap Check for Updates to look for new releases",
+                                color = TextSecondary,
+                                fontSize = 12.5.sp
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Download / Open Official Update URL Button
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(EmeraldSavings.copy(alpha = 0.18f))
+                        .border(BorderStroke(1.2.dp, EmeraldSavings), RoundedCornerShape(12.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(bounded = true, color = EmeraldSavings),
+                            onClick = { onOpenDownloadUrl(downloadUrl) }
+                        )
+                        .padding(horizontal = 14.dp)
+                        .testTag("dialog_update_download_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = null,
+                            tint = EmeraldSavings,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isArabic) "تحميل وتحديث التطبيق" else "Download Update",
+                            color = EmeraldSavings,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Re-check Button
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(ElectricCyan.copy(alpha = 0.15f))
+                        .border(BorderStroke(1.2.dp, ElectricCyan), RoundedCornerShape(12.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(bounded = true, color = ElectricCyan),
+                            onClick = onCheckNow
+                        )
+                        .padding(horizontal = 14.dp)
+                        .testTag("dialog_update_check_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.SystemUpdate,
+                            contentDescription = null,
+                            tint = ElectricCyan,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isArabic) "إعادة فحص التحديثات" else "Check Again",
                             color = ElectricCyan,
                             fontSize = 13.5.sp,
                             fontWeight = FontWeight.Bold

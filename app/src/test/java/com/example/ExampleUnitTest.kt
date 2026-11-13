@@ -49,4 +49,13 @@ class ExampleUnitTest {
         assertEquals("Charfeddine Ka", com.example.ui.viewmodel.ShoppingViewModel.DEVELOPER_NAME)
         assertEquals("v1.0 Build 1", com.example.ui.viewmodel.ShoppingViewModel.APP_VERSION)
     }
+
+    @Test
+    fun testUpdateVersionComparison() {
+        assertEquals("https://github.com/charfeddine23/ShopyPelse.apk", com.example.util.AppUpdateChecker.UPDATE_URL)
+        assertTrue(com.example.util.AppUpdateChecker.isNewerVersion("v1.1", "1.0"))
+        assertTrue(com.example.util.AppUpdateChecker.isNewerVersion("2.0.0", "1.9.5"))
+        assertTrue(!com.example.util.AppUpdateChecker.isNewerVersion("v1.0", "1.0"))
+        assertTrue(!com.example.util.AppUpdateChecker.isNewerVersion("0.9", "1.0"))
+    }
 }

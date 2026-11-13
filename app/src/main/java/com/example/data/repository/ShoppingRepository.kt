@@ -25,11 +25,13 @@ class ShoppingRepository(
 
     suspend fun deleteSpendingRecord(id: Long) = spendingDao.deleteSpendingRecord(id)
 
-    suspend fun ensureSpendingSeeded() {
+    suspend fun ensureSpendingSeeded(alreadySeeded: Boolean): Boolean {
+        if (alreadySeeded) return true
         val records = spendingDao.getAllSpendingRecords().first()
         if (records.isEmpty()) {
             spendingDao.insertSpendingRecords(DatabaseInitialData.initialSpendingRecords)
         }
+        return true
     }
 
     suspend fun insertItem(item: ShoppingItem): Long {
@@ -86,13 +88,15 @@ class ShoppingRepository(
     suspend fun getPriceHistory(barcode: String): Flow<List<PriceHistory>> =
         marketPriceDao.getPriceHistory(barcode)
 
-    suspend fun ensureCatalogPopulated() {
+    suspend fun ensureCatalogPopulated(alreadySeeded: Boolean): Boolean {
+        if (alreadySeeded) return true
         val currentPrices = marketPriceDao.getAllMarketPrices().first()
         if (currentPrices.size < 4900) {
             val catalog5000 = com.example.data.local.CatalogDataGenerator.generate5000Products()
             val marketPrices5000 = com.example.data.local.CatalogDataGenerator.generateMarketPricesForCatalog(catalog5000)
             marketPriceDao.insertMarketPrices(marketPrices5000)
         }
+        return true
     }
 
     suspend fun addNewProductPrice(

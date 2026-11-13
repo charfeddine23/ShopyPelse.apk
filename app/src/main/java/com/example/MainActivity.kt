@@ -78,6 +78,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.example.data.local.AppDatabase
+import com.example.data.local.UserPreferencesRepository
 import com.example.data.repository.ShoppingRepository
 import com.example.ui.components.LiquidGlassBackground
 import com.example.ui.components.QrShareDialog
@@ -113,7 +114,8 @@ class MainActivity : BaseActivity() {
 
         val database = AppDatabase.getDatabase(applicationContext, lifecycleScope)
         val repository = ShoppingRepository(database.shoppingDao(), database.marketPriceDao(), database.spendingDao())
-        val factory = ShoppingViewModelFactory(repository)
+        val preferencesRepository = UserPreferencesRepository(applicationContext)
+        val factory = ShoppingViewModelFactory(repository, preferencesRepository)
         viewModel = ViewModelProvider(this, factory)[ShoppingViewModel::class.java]
 
         setContent {
@@ -143,14 +145,17 @@ class MainActivity : BaseActivity() {
 
 @Composable
 fun ShopyPulseApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
-    var currentScreen by remember { mutableStateOf(Screen.HOME) }
+    val currentScreenName by viewModel.currentScreenName.collectAsStateWithLifecycle()
+    val currentScreen = remember(currentScreenName) {
+        Screen.entries.firstOrNull { it.name == currentScreenName } ?: Screen.HOME
+    }
     var showQrShareDialog by remember { mutableStateOf(false) }
     val isArabic by viewModel.isArabic.collectAsStateWithLifecycle()
     val isLiquidDockSwipeEnabled by viewModel.isLiquidDockSwipeEnabled.collectAsStateWithLifecycle()
 
     // Handle back button when on sub-screens
     BackHandler(enabled = currentScreen != Screen.HOME) {
-        currentScreen = Screen.HOME
+        viewModel.setCurrentScreen(Screen.HOME.name)
     }
 
     LiquidGlassBackground(isDarkMode = isDarkMode) {
@@ -162,7 +167,7 @@ fun ShopyPulseApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
                         currentScreen = currentScreen,
                         isArabic = isArabic,
                         isLiquidSwipeEnabled = isLiquidDockSwipeEnabled,
-                        onSelectScreen = { currentScreen = it }
+                        onSelectScreen = { viewModel.setCurrentScreen(it.name) }
                     )
                 }
             },
@@ -183,32 +188,32 @@ fun ShopyPulseApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
                     when (screen) {
                         Screen.HOME -> HomeScreen(
                             viewModel = viewModel,
-                            onNavigateToPriceComparison = { currentScreen = Screen.PRICES },
-                            onNavigateToSupermarketMode = { currentScreen = Screen.SUPERMARKET },
-                            onNavigateToSettings = { currentScreen = Screen.SETTINGS },
-                            onNavigateToStatistics = { currentScreen = Screen.STATISTICS },
+                            onNavigateToPriceComparison = { viewModel.setCurrentScreen(Screen.PRICES.name) },
+                            onNavigateToSupermarketMode = { viewModel.setCurrentScreen(Screen.SUPERMARKET.name) },
+                            onNavigateToSettings = { viewModel.setCurrentScreen(Screen.SETTINGS.name) },
+                            onNavigateToStatistics = { viewModel.setCurrentScreen(Screen.STATISTICS.name) },
                             onOpenQrShare = { showQrShareDialog = true }
                         )
 
                         Screen.PRICES -> PriceComparisonScreen(
                             viewModel = viewModel,
-                            onBack = { currentScreen = Screen.HOME }
+                            onBack = { viewModel.setCurrentScreen(Screen.HOME.name) }
                         )
 
                         Screen.SUPERMARKET -> SupermarketModeScreen(
                             viewModel = viewModel,
-                            onBack = { currentScreen = Screen.HOME }
+                            onBack = { viewModel.setCurrentScreen(Screen.HOME.name) }
                         )
 
                         Screen.SETTINGS -> SettingsScreen(
                             viewModel = viewModel,
-                            onBack = { currentScreen = Screen.HOME },
+                            onBack = { viewModel.setCurrentScreen(Screen.HOME.name) },
                             onOpenQrShare = { showQrShareDialog = true }
                         )
 
                         Screen.STATISTICS -> StatisticsScreen(
                             viewModel = viewModel,
-                            onBack = { currentScreen = Screen.HOME }
+                            onBack = { viewModel.setCurrentScreen(Screen.HOME.name) }
                         )
                     }
                 }
