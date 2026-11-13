@@ -678,13 +678,13 @@ private fun LiquidDockSwipeToggleSection(
 
                 Column {
                     Text(
-                        text = if (isArabic) "فيزياء المياه التفاعلية" else "Fluid Water Touch Physics",
+                        text = if (isArabic) "فيزياء المياه في الدوك السفلي" else "Bottom Dock Fluid Water",
                         color = TextPrimary,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = if (isArabic) "تموجات وانعكاس المياه عند اللمس والتمرير" else "Real-time water ripples & touch waves",
+                        text = if (isArabic) "تموجات المياه والتنقل بالسحب عبر الدوك" else "Water ripples & fluid swipe navigation",
                         color = if (isEnabled) ElectricCyan else TextSecondary,
                         fontSize = 11.sp
                     )

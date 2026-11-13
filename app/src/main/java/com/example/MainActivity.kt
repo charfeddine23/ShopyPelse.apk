@@ -18,6 +18,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,6 +53,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -59,6 +61,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -74,9 +77,11 @@ import com.example.data.local.AppDatabase
 import com.example.data.local.UserPreferencesRepository
 import com.example.data.repository.ShoppingRepository
 import com.example.ui.components.AppUpdateOverlay
-import com.example.ui.components.InteractiveFluidWaterSurface
+import com.example.ui.components.FluidWaterState
 import com.example.ui.components.LiquidGlassBackground
 import com.example.ui.components.QrShareDialog
+import com.example.ui.components.fluidWaterDistortion
+import com.example.ui.components.fluidWaterTouchPhysics
 import com.example.ui.components.rememberFluidWaterState
 import com.example.util.AppUpdateStatus
 import com.example.ui.screens.HomeScreen
@@ -92,6 +97,7 @@ import com.example.ui.viewmodel.ShoppingViewModel
 import com.example.ui.viewmodel.ShoppingViewModelFactory
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 enum class Screen {
     HOME,
@@ -191,8 +197,8 @@ fun ShopyPulseApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
         snapAnimationSpec = springSnapSpec
     )
 
-    // Interactive 60-90 FPS Fluid Water Physics engine
-    val fluidWaterState = rememberFluidWaterState(enabled = isFluidWaterEnabled)
+    // Interactive 60-90 FPS Fluid Water Physics engine (scoped strictly to the bottom dock)
+    val dockWaterState = rememberFluidWaterState(enabled = isFluidWaterEnabled)
 
     // Keep ViewModel screen persisted when user finishes swiping via HorizontalPager
     LaunchedEffect(pagerState) {
@@ -207,12 +213,12 @@ fun ShopyPulseApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
             }
     }
 
-    // Feed continuous HorizontalPager swipe velocity into the water surface current shader
+    // Feed continuous HorizontalPager swipe velocity into the dock water surface current shader
     LaunchedEffect(pagerState, isFluidWaterEnabled) {
         if (!isFluidWaterEnabled) return@LaunchedEffect
         snapshotFlow { pagerState.currentPageOffsetFraction }
             .collect { offsetFraction ->
-                fluidWaterState.updatePageScrollVelocity(offsetFraction)
+                dockWaterState.updatePageScrollVelocity(offsetFraction)
             }
     }
 
@@ -236,41 +242,38 @@ fun ShopyPulseApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
     }
 
     LiquidGlassBackground(isDarkMode = isDarkMode) {
-        InteractiveFluidWaterSurface(
-            waterState = fluidWaterState,
-            enabled = isFluidWaterEnabled,
-            isDarkMode = isDarkMode
-        ) {
-            Scaffold(
-                containerColor = Color.Transparent,
-                bottomBar = {
-                    if (currentScreen != Screen.SUPERMARKET) {
-                        val activeDockScreen = pagerScreens.getOrNull(pagerState.currentPage) ?: currentScreen
-                        LiquidGlassBottomNavBar(
-                            currentScreen = if (currentScreen in pagerScreens) activeDockScreen else currentScreen,
-                            isArabic = isArabic,
-                            onSelectScreen = { targetScreen ->
-                                viewModel.setCurrentScreen(targetScreen.name)
-                                val idx = pagerScreens.indexOf(targetScreen)
-                                if (idx >= 0) {
-                                    coroutineScope.launch {
-                                        pagerState.animateScrollToPage(
-                                            page = idx,
-                                            animationSpec = spring(
-                                                dampingRatio = 0.86f,
-                                                stiffness = Spring.StiffnessMediumLow
-                                            )
+        Scaffold(
+            containerColor = Color.Transparent,
+            bottomBar = {
+                if (currentScreen != Screen.SUPERMARKET) {
+                    val activeDockScreen = pagerScreens.getOrNull(pagerState.currentPage) ?: currentScreen
+                    LiquidGlassBottomNavBar(
+                        currentScreen = if (currentScreen in pagerScreens) activeDockScreen else currentScreen,
+                        isArabic = isArabic,
+                        waterState = dockWaterState,
+                        isFluidWaterEnabled = isFluidWaterEnabled,
+                        onSelectScreen = { targetScreen ->
+                            viewModel.setCurrentScreen(targetScreen.name)
+                            val idx = pagerScreens.indexOf(targetScreen)
+                            if (idx >= 0) {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(
+                                        page = idx,
+                                        animationSpec = spring(
+                                            dampingRatio = 0.86f,
+                                            stiffness = Spring.StiffnessMediumLow
                                         )
-                                    }
+                                    )
                                 }
                             }
-                        )
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-            ) { innerPadding ->
+                        }
+                    )
+                }
+            },
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+        ) { innerPadding ->
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -335,7 +338,6 @@ fun ShopyPulseApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
                     }
                 }
             }
-        }
 
         // Offline QR Share Dialog
         if (showQrShareDialog) {
@@ -381,9 +383,15 @@ fun ShopyPulseApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
 fun LiquidGlassBottomNavBar(
     currentScreen: Screen,
     isArabic: Boolean,
+    waterState: FluidWaterState,
+    isFluidWaterEnabled: Boolean,
     onSelectScreen: (Screen) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val dockScreens = remember { listOf(Screen.HOME, Screen.PRICES, Screen.SETTINGS) }
+    val latestCurrentScreen by rememberUpdatedState(currentScreen)
+    val latestOnSelectScreen by rememberUpdatedState(onSelectScreen)
+
     // Dynamic Layout Direction: Mirrors automatically according to language (RTL for Arabic, LTR for English)
     Box(
         modifier = modifier
@@ -393,7 +401,7 @@ fun LiquidGlassBottomNavBar(
             .testTag("liquid_glass_bottom_nav"),
         contentAlignment = Alignment.Center
     ) {
-        // Clean Floating Dark Capsule Dock (liquid droplet overlay removed; full-screen fluid water surface active)
+        // Floating Dark Capsule Dock with scoped 60-90 FPS Fluid Water Physics & Horizontal Scrub Navigation
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -403,6 +411,54 @@ fun LiquidGlassBottomNavBar(
                     BorderStroke(1.dp, Color(0x33475569)),
                     RoundedCornerShape(32.dp)
                 )
+                .fluidWaterTouchPhysics(
+                    state = waterState,
+                    enabled = isFluidWaterEnabled
+                )
+                .fluidWaterDistortion(
+                    state = waterState,
+                    enabled = isFluidWaterEnabled,
+                    isDarkMode = true
+                )
+                .pointerInput(isArabic) {
+                    var dragStartIndex = 0
+                    var lastEmittedIndex = 0
+                    var cumulativeDragX = 0f
+
+                    detectHorizontalDragGestures(
+                        onDragStart = {
+                            dragStartIndex = dockScreens.indexOf(latestCurrentScreen).coerceAtLeast(0)
+                            lastEmittedIndex = dragStartIndex
+                            cumulativeDragX = 0f
+                        },
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            cumulativeDragX += dragAmount
+                            val width = size.width.toFloat().coerceAtLeast(1f)
+                            val xFraction = (change.position.x / width).coerceIn(0f, 0.999f)
+                            val visualZone = (xFraction * dockScreens.size).toInt().coerceIn(0, dockScreens.lastIndex)
+                            val targetIndex = if (isArabic) dockScreens.lastIndex - visualZone else visualZone
+                            if (targetIndex != lastEmittedIndex) {
+                                lastEmittedIndex = targetIndex
+                                latestOnSelectScreen(dockScreens[targetIndex])
+                            }
+                        },
+                        onDragEnd = {
+                            val quickSwipePx = 30.dp.toPx()
+                            if (lastEmittedIndex == dragStartIndex && abs(cumulativeDragX) >= quickSwipePx) {
+                                val step = if (isArabic) {
+                                    if (cumulativeDragX > 0f) -1 else 1
+                                } else {
+                                    if (cumulativeDragX > 0f) 1 else -1
+                                }
+                                val targetIndex = (dragStartIndex + step).coerceIn(0, dockScreens.lastIndex)
+                                if (targetIndex != dragStartIndex) {
+                                    latestOnSelectScreen(dockScreens[targetIndex])
+                                }
+                            }
+                        }
+                    )
+                }
                 .padding(horizontal = 6.dp, vertical = 6.dp)
         ) {
             Row(
