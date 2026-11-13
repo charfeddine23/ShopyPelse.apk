@@ -67,22 +67,25 @@ sealed class ApkDownloadState {
 object AppUpdateChecker {
 
     const val UPDATE_URL = "https://github.com/charfeddine23/ShopyPelse.apk"
-    private val RELEASE_API_ENDPOINTS = listOf(
-        "https://api.github.com/repos/charfeddine23/ShopyPelse.apk/releases/latest",
-        "https://api.github.com/repos/charfeddine23/ShopyPelse/releases/latest"
+    private val REPO_SLUGS = listOf(
+        "charfeddine23/ShopyPelse.apk",
+        "charfeddine23/ShopyPelse"
     )
+    private val RELEASE_API_ENDPOINTS = REPO_SLUGS.map {
+        "https://api.github.com/repos/$it/releases/latest"
+    }
 
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
             .followRedirects(true)
             .followSslRedirects(true)
             .build()
     }
 
     suspend fun checkForUpdate(currentVersionName: String): AppUpdateStatus = withContext(Dispatchers.IO) {
-        // 1. Try GitHub Releases API to read version tag, release notes, and APK asset URL
+        // 1. Try GitHub Releases API to read version tag, release notes, and direct .apk asset URL
         for (apiUrl in RELEASE_API_ENDPOINTS) {
             try {
                 val request = Request.Builder()
@@ -101,19 +104,9 @@ object AppUpdateChecker {
                             val releaseNotes = json.optString("body", "").trim()
                             val publishedAt = json.optString("published_at", "").take(10)
 
-                            var apkDownloadUrl = UPDATE_URL
-                            val assets = json.optJSONArray("assets")
-                            if (assets != null) {
-                                for (i in 0 until assets.length()) {
-                                    val asset = assets.getJSONObject(i)
-                                    val assetName = asset.optString("name", "")
-                                    val browserUrl = asset.optString("browser_download_url", "")
-                                    if (assetName.endsWith(".apk", ignoreCase = true) && browserUrl.isNotBlank()) {
-                                        apkDownloadUrl = browserUrl
-                                        break
-                                    }
-                                }
-                            }
+                            val apkDownloadUrl = extractApkAssetUrl(json)
+                                ?: resolveApkUrlFromGithub()
+                                ?: UPDATE_URL
 
                             val remoteVersion = tagName.ifBlank { releaseName }.ifBlank { currentVersionName }
                             return@withContext if (isNewerVersion(remoteVersion, currentVersionName)) {
@@ -138,15 +131,11 @@ object AppUpdateChecker {
             }
         }
 
-        // 2. Fallback: Check GitHub Tags API
-        val tagApiEndpoints = listOf(
-            "https://api.github.com/repos/charfeddine23/ShopyPelse.apk/tags",
-            "https://api.github.com/repos/charfeddine23/ShopyPelse/tags"
-        )
-        for (tagUrl in tagApiEndpoints) {
+        // 2. Fallback: Check GitHub Tags API + resolve APK asset URL
+        for (slug in REPO_SLUGS) {
             try {
                 val tagReq = Request.Builder()
-                    .url(tagUrl)
+                    .url("https://api.github.com/repos/$slug/tags")
                     .header("Accept", "application/vnd.github+json")
                     .header("User-Agent", "ShopyPulse-Android")
                     .build()
@@ -159,17 +148,18 @@ object AppUpdateChecker {
                             if (tagsArray.length() > 0) {
                                 val latestTag = tagsArray.getJSONObject(0).optString("name", "").trim()
                                 if (latestTag.isNotBlank()) {
+                                    val resolvedApk = resolveApkUrlFromGithub() ?: UPDATE_URL
                                     return@withContext if (isNewerVersion(latestTag, currentVersionName)) {
                                         AppUpdateStatus.UpdateAvailable(
                                             currentVersion = currentVersionName,
                                             latestVersion = latestTag,
                                             releaseNotes = "",
-                                            downloadUrl = UPDATE_URL
+                                            downloadUrl = resolvedApk
                                         )
                                     } else {
                                         AppUpdateStatus.UpToDate(
                                             currentVersion = currentVersionName,
-                                            directUrl = UPDATE_URL
+                                            directUrl = resolvedApk
                                         )
                                     }
                                 }
@@ -182,8 +172,15 @@ object AppUpdateChecker {
             }
         }
 
-        // 3. Fallback: Probe direct URL
+        // 3. Fallback: Resolve direct APK binary from repo releases/contents or direct endpoint
         try {
+            val resolvedApk = resolveApkUrlFromGithub()
+            if (!resolvedApk.isNullOrBlank()) {
+                return@withContext AppUpdateStatus.ReadyDirectLink(
+                    currentVersion = currentVersionName,
+                    downloadUrl = resolvedApk
+                )
+            }
             val headReq = Request.Builder()
                 .url(UPDATE_URL)
                 .head()
@@ -206,6 +203,77 @@ object AppUpdateChecker {
         }
     }
 
+    private fun extractApkAssetUrl(releaseJson: JSONObject): String? {
+        val assets = releaseJson.optJSONArray("assets") ?: return null
+        for (i in 0 until assets.length()) {
+            val asset = assets.optJSONObject(i) ?: continue
+            val assetName = asset.optString("name", "")
+            val browserUrl = asset.optString("browser_download_url", "")
+            if (assetName.endsWith(".apk", ignoreCase = true) && browserUrl.isNotBlank()) {
+                return browserUrl
+            }
+        }
+        return null
+    }
+
+    /**
+     * Resolves a direct downloadable .apk binary URL from GitHub Releases or repo contents
+     * so downloading happens strictly inside the app without ever opening a browser.
+     */
+    private fun resolveApkUrlFromGithub(): String? {
+        // Try recent releases list
+        for (slug in REPO_SLUGS) {
+            try {
+                val req = Request.Builder()
+                    .url("https://api.github.com/repos/$slug/releases")
+                    .header("Accept", "application/vnd.github+json")
+                    .header("User-Agent", "ShopyPulse-Android")
+                    .build()
+                client.newCall(req).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val body = resp.body?.string()
+                        if (!body.isNullOrBlank() && body.trim().startsWith("[")) {
+                            val arr = JSONArray(body)
+                            for (i in 0 until arr.length()) {
+                                val rel = arr.optJSONObject(i) ?: continue
+                                val apkUrl = extractApkAssetUrl(rel)
+                                if (!apkUrl.isNullOrBlank()) return apkUrl
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
+        // Try root repository contents for any committed .apk binary
+        for (slug in REPO_SLUGS) {
+            try {
+                val req = Request.Builder()
+                    .url("https://api.github.com/repos/$slug/contents")
+                    .header("Accept", "application/vnd.github+json")
+                    .header("User-Agent", "ShopyPulse-Android")
+                    .build()
+                client.newCall(req).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val body = resp.body?.string()
+                        if (!body.isNullOrBlank() && body.trim().startsWith("[")) {
+                            val arr = JSONArray(body)
+                            for (i in 0 until arr.length()) {
+                                val item = arr.optJSONObject(i) ?: continue
+                                val name = item.optString("name", "")
+                                val rawUrl = item.optString("download_url", "")
+                                if (name.endsWith(".apk", ignoreCase = true) && rawUrl.isNotBlank()) {
+                                    return rawUrl
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+        return null
+    }
+
     /**
      * Streams the APK directly inside the app into cache/updates/ with real-time progress.
      */
@@ -226,9 +294,20 @@ object AppUpdateChecker {
         val targetFile = File(updatesDir, "Shopy.Pulse.$safeVersion.apk")
 
         try {
+            // If URL is the repository homepage or not yet a direct binary link, resolve the real APK asset inside the app
+            val effectiveUrl = if (
+                downloadUrl.equals(UPDATE_URL, ignoreCase = true) ||
+                downloadUrl.equals("$UPDATE_URL/", ignoreCase = true)
+            ) {
+                resolveApkUrlFromGithub() ?: downloadUrl
+            } else {
+                downloadUrl
+            }
+
             val request = Request.Builder()
-                .url(downloadUrl)
+                .url(effectiveUrl)
                 .header("User-Agent", "ShopyPulse-Android")
+                .header("Accept", "application/vnd.android.package-archive, application/octet-stream, */*")
                 .build()
 
             client.newCall(request).execute().use { response ->
@@ -237,7 +316,7 @@ object AppUpdateChecker {
                         ApkDownloadState.Failed(
                             messageAr = "تعذر تحميل ملف التحديث (رمز ${response.code})",
                             messageEn = "Failed to download update (HTTP ${response.code})",
-                            fallbackUrl = downloadUrl
+                            fallbackUrl = effectiveUrl
                         )
                     )
                     return@flow
@@ -249,7 +328,7 @@ object AppUpdateChecker {
                         ApkDownloadState.Failed(
                             messageAr = "ملف التحديث فارغ أو غير متاح",
                             messageEn = "Update package is empty or unavailable",
-                            fallbackUrl = downloadUrl
+                            fallbackUrl = effectiveUrl
                         )
                     )
                     return@flow
@@ -259,9 +338,9 @@ object AppUpdateChecker {
                 if (contentType.contains("text/html", ignoreCase = true)) {
                     emit(
                         ApkDownloadState.Failed(
-                            messageAr = "الرابط الحالي يشير إلى صفحة ويب وليس ملف APK مباشر.",
-                            messageEn = "The link currently points to a web page rather than a direct APK asset.",
-                            fallbackUrl = downloadUrl
+                            messageAr = "لم يتم العثور على ملف APK مباشر في هذا الإصدار بعد.",
+                            messageEn = "No direct APK release asset was found yet.",
+                            fallbackUrl = effectiveUrl
                         )
                     )
                     return@flow
@@ -269,6 +348,8 @@ object AppUpdateChecker {
 
                 val totalBytes = body.contentLength()
                 var downloadedBytes = 0L
+                var lastEmittedPercent = -1
+                var lastEmittedBytes = 0L
                 val buffer = ByteArray(16 * 1024)
                 var checkedMagic = false
 
@@ -286,9 +367,9 @@ object AppUpdateChecker {
                                     targetFile.delete()
                                     emit(
                                         ApkDownloadState.Failed(
-                                            messageAr = "الملف الذي تم استلامه ليس حزمة APK صالحة.",
+                                            messageAr = "الملف المستلم ليس حزمة APK صالحة.",
                                             messageEn = "Downloaded file is not a valid APK package.",
-                                            fallbackUrl = downloadUrl
+                                            fallbackUrl = effectiveUrl
                                         )
                                     )
                                     return@flow
@@ -302,25 +383,43 @@ object AppUpdateChecker {
                             } else {
                                 -1
                             }
-                            emit(
-                                ApkDownloadState.Downloading(
-                                    progressPercent = percent,
-                                    downloadedBytes = downloadedBytes,
-                                    totalBytes = totalBytes
+
+                            val shouldEmit = if (percent >= 0) {
+                                percent != lastEmittedPercent
+                            } else {
+                                downloadedBytes - lastEmittedBytes >= 131_072L
+                            }
+
+                            if (shouldEmit) {
+                                lastEmittedPercent = percent
+                                lastEmittedBytes = downloadedBytes
+                                emit(
+                                    ApkDownloadState.Downloading(
+                                        progressPercent = percent,
+                                        downloadedBytes = downloadedBytes,
+                                        totalBytes = totalBytes
+                                    )
                                 )
-                            )
+                            }
                         }
                         output.flush()
                     }
                 }
 
+                emit(
+                    ApkDownloadState.Downloading(
+                        progressPercent = 100,
+                        downloadedBytes = downloadedBytes,
+                        totalBytes = if (totalBytes > 0) totalBytes else downloadedBytes
+                    )
+                )
                 emit(ApkDownloadState.Downloaded(targetFile))
             }
         } catch (e: Exception) {
             if (targetFile.exists()) targetFile.delete()
             emit(
                 ApkDownloadState.Failed(
-                    messageAr = "حدث خطأ أثناء التحميل: ${e.localizedMessage ?: "خطأ في الشبكة"}",
+                    messageAr = "تعذر إكمال التحميل: ${e.localizedMessage ?: "خطأ في الشبكة"}",
                     messageEn = "Download failed: ${e.localizedMessage ?: "Network error"}",
                     fallbackUrl = downloadUrl
                 )

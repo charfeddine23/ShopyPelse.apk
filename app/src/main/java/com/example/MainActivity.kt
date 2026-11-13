@@ -1,7 +1,5 @@
 package com.example
 
-import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import com.example.ui.BaseActivity
@@ -372,17 +370,7 @@ fun ShopyPulseApp(viewModel: ShoppingViewModel, isDarkMode: Boolean = true) {
                         )
                     },
                     onInstallClick = { viewModel.installDownloadedApk(context) },
-                    onCancelDownload = { viewModel.cancelUpdateDownload() },
-                    onFallbackBrowser = { url ->
-                        try {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            context.startActivity(intent)
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        }
-                    }
+                    onCancelDownload = { viewModel.cancelUpdateDownload() }
                 )
             }
         }

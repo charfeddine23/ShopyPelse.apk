@@ -99,7 +99,6 @@ fun AppUpdateOverlay(
     onUpdateClick: (String) -> Unit,
     onInstallClick: () -> Unit,
     onCancelDownload: () -> Unit,
-    onFallbackBrowser: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     BackHandler(onBack = onDismiss)
@@ -443,29 +442,6 @@ fun AppUpdateOverlay(
                                             onClick = { onUpdateClick(updateInfo.downloadUrl) },
                                             testTag = "update_overlay_retry_button"
                                         )
-
-                                        Spacer(modifier = Modifier.height(4.dp))
-
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(48.dp)
-                                                .clip(RoundedCornerShape(14.dp))
-                                                .clickable(
-                                                    interactionSource = remember { MutableInteractionSource() },
-                                                    indication = ripple(bounded = true, color = Color.White),
-                                                    onClick = { onFallbackBrowser(apkDownloadState.fallbackUrl) }
-                                                )
-                                                .testTag("update_overlay_browser_fallback_button"),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = if (isArabic) "التحميل عبر المتصفح" else "Download in Browser",
-                                                color = UpdateMutedGray,
-                                                fontSize = 12.5.sp,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                        }
                                     }
                                 }
                             }

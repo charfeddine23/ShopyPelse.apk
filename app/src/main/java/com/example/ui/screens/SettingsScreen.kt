@@ -1,6 +1,5 @@
 package com.example.ui.screens
 
-import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -267,6 +266,7 @@ fun SettingsScreen(
                 AppUpdateSection(
                     isArabic = isArabic,
                     updateStatus = updateStatus,
+                    apkDownloadState = apkDownloadState,
                     onOpenUpdate = {
                         if (updateStatus is AppUpdateStatus.UpdateAvailable) {
                             viewModel.openUpdateOverlayIfAvailable()
@@ -339,17 +339,7 @@ fun SettingsScreen(
                     viewModel.startInAppUpdateDownload(context = context, url = url)
                 },
                 onInstallApk = { viewModel.installDownloadedApk(context) },
-                onCancelDownload = { viewModel.cancelUpdateDownload() },
-                onOpenFallbackUrl = { url ->
-                    try {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        context.startActivity(intent)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
+                onCancelDownload = { viewModel.cancelUpdateDownload() }
             )
         }
 
@@ -1072,14 +1062,30 @@ private fun GoogleDriveDialog(
 private fun AppUpdateSection(
     isArabic: Boolean,
     updateStatus: AppUpdateStatus,
+    apkDownloadState: ApkDownloadState,
     onOpenUpdate: () -> Unit
 ) {
     val hasUpdate = updateStatus is AppUpdateStatus.UpdateAvailable
-    val title = when {
-        hasUpdate && isArabic -> "تحديث جديد متاح (${(updateStatus as AppUpdateStatus.UpdateAvailable).latestVersion})"
-        hasUpdate -> "New Update Available (${(updateStatus as AppUpdateStatus.UpdateAvailable).latestVersion})"
-        isArabic -> "تحديث التطبيق"
-        else -> "App Updates"
+    val title = when (apkDownloadState) {
+        is ApkDownloadState.Downloading -> if (isArabic) {
+            val pct = if (apkDownloadState.progressPercent >= 0) "${apkDownloadState.progressPercent}%" else "..."
+            "جاري تحميل التحديث ($pct)"
+        } else {
+            val pct = if (apkDownloadState.progressPercent >= 0) "${apkDownloadState.progressPercent}%" else "..."
+            "Downloading Update ($pct)"
+        }
+        is ApkDownloadState.Downloaded,
+        is ApkDownloadState.RequiresInstallPermission -> if (isArabic) {
+            "التحديث جاهز للتثبيت"
+        } else {
+            "Update Ready to Install"
+        }
+        else -> when {
+            hasUpdate && isArabic -> "تحديث جديد متاح (${(updateStatus as AppUpdateStatus.UpdateAvailable).latestVersion})"
+            hasUpdate -> "New Update Available (${(updateStatus as AppUpdateStatus.UpdateAvailable).latestVersion})"
+            isArabic -> "تحديث التطبيق"
+            else -> "App Updates"
+        }
     }
     SingleActionNavButton(
         icon = Icons.Default.SystemUpdate,
@@ -1103,8 +1109,7 @@ private fun AppUpdateDialog(
     onCheckNow: () -> Unit,
     onStartInAppDownload: (String) -> Unit,
     onInstallApk: () -> Unit,
-    onCancelDownload: () -> Unit,
-    onOpenFallbackUrl: (String) -> Unit
+    onCancelDownload: () -> Unit
 ) {
     val isLight = MaterialTheme.colorScheme.background == BackgroundLight
     val dialogBg = if (isLight) Color(0xFFF8FAFC) else Color(0xFF0F172A)
@@ -1459,16 +1464,6 @@ private fun AppUpdateDialog(
                                     color = EmeraldSavings,
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.Bold
-                                )
-                            }
-                            TextButton(
-                                onClick = { onOpenFallbackUrl(apkDownloadState.fallbackUrl) },
-                                modifier = Modifier.align(Alignment.CenterHorizontally)
-                            ) {
-                                Text(
-                                    text = if (isArabic) "فتح عبر المتصفح" else "Open in Browser",
-                                    color = TextMuted,
-                                    fontSize = 12.sp
                                 )
                             }
                         }
