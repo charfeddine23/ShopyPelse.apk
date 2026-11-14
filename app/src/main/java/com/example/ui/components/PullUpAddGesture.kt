@@ -22,28 +22,32 @@ data class PullUpGestureState(
 )
 
 internal object SingleFingerPullUpDetector {
+    // Tight vertical cone (~14 degrees max deviation from straight up: |dy| >= 4 * |dx|)
+    private const val STRICT_UPWARD_SLOPE_RATIO = 4.0f
+
     fun isDominantUpwardDrag(dx: Float, dy: Float, touchSlopPx: Float): Boolean {
-        return dy < -touchSlopPx && abs(dy) > abs(dx) * 1.15f
+        return dy < -touchSlopPx && abs(dy) >= abs(dx) * STRICT_UPWARD_SLOPE_RATIO
     }
 
     fun isAbandonedForOtherGesture(dx: Float, dy: Float, touchSlopPx: Float): Boolean {
-        val downwardDrag = dy > touchSlopPx && abs(dy) >= abs(dx)
-        val horizontalDrag = abs(dx) > touchSlopPx && abs(dx) >= abs(dy)
-        return downwardDrag || horizontalDrag
+        val downwardDrag = dy > touchSlopPx * 0.5f
+        val offAxisHorizontal = abs(dx) > touchSlopPx * 0.6f && abs(dy) < abs(dx) * STRICT_UPWARD_SLOPE_RATIO
+        val outsideConeAfterTravel = abs(dy) > touchSlopPx && abs(dy) < abs(dx) * STRICT_UPWARD_SLOPE_RATIO
+        return downwardDrag || offAxisHorizontal || outsideConeAfterTravel
     }
 
     fun computeVisualPullOffsetPx(dy: Float, maxVisualPullPx: Float): Float {
         return ((-dy).coerceAtLeast(0f) * 0.42f).coerceIn(0f, maxVisualPullPx)
     }
 
-    fun isTriggerThresholdReached(dy: Float, thresholdPx: Float): Boolean {
-        return -dy >= thresholdPx
+    fun isTriggerThresholdReached(dx: Float, dy: Float, thresholdPx: Float): Boolean {
+        return -dy >= thresholdPx && abs(dy) >= abs(dx) * STRICT_UPWARD_SLOPE_RATIO
     }
 }
 
 /**
- * Detects a single-finger upward pull gesture on the empty shopping list card
- * without interfering with horizontal tab paging, downward list scrolling,
+ * Detects a strict straight-up single-finger pull gesture on the empty shopping list card
+ * without interfering with diagonal/horizontal tab paging, downward list scrolling,
  * button taps, or the parent two-finger full-screen gesture.
  */
 fun Modifier.singleFingerPullUpToAdd(
@@ -54,7 +58,7 @@ fun Modifier.singleFingerPullUpToAdd(
 ): Modifier = composed {
     val latestEnabled by rememberUpdatedState(enabled)
     val latestOnStateChanged by rememberUpdatedState(onStateChanged)
-    val latestOnThresholdHaptic by rememberUpdatedState(onThresholdReachedHaptic)
+    val latestOnThresholdReachedHaptic by rememberUpdatedState(onThresholdReachedHaptic)
     val latestOnTriggered by rememberUpdatedState(onTriggered)
     val touchSlopPx = LocalViewConfiguration.current.touchSlop
 
@@ -131,14 +135,23 @@ fun Modifier.singleFingerPullUpToAdd(
                 }
 
                 if (isDraggingUp) {
+                    if (abs(dy) < abs(dx) * 3.0f || dy >= 0f) {
+                        latestOnStateChanged(PullUpGestureState())
+                        isDraggingUp = false
+                        thresholdReached = false
+                        hapticFired = false
+                        abandoned = true
+                        continue
+                    }
+
                     event.changes.forEach { it.consume() }
                     val visualOffset = SingleFingerPullUpDetector.computeVisualPullOffsetPx(dy, maxVisualPullPx)
-                    val nowReached = SingleFingerPullUpDetector.isTriggerThresholdReached(dy, triggerThresholdPx)
+                    val nowReached = SingleFingerPullUpDetector.isTriggerThresholdReached(dx, dy, triggerThresholdPx)
                     thresholdReached = nowReached
 
                     if (nowReached && !hapticFired) {
                         hapticFired = true
-                        latestOnThresholdHaptic()
+                        latestOnThresholdReachedHaptic()
                     } else if (!nowReached) {
                         hapticFired = false
                     }

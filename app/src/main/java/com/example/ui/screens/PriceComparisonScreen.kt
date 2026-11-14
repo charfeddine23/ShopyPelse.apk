@@ -134,6 +134,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import com.example.util.ProductGroup
 import com.example.util.ProductVariant
 import com.example.util.LocalizationUtil
+import com.example.util.SmartSearchUtil
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -2105,17 +2106,7 @@ fun ProductGroupCard(
                     Spacer(modifier = Modifier.height(6.dp))
 
                     val displayedVariants = remember(group.variants, searchQuery) {
-                        val q = searchQuery.trim()
-                        if (q.isEmpty()) {
-                            group.variants
-                        } else {
-                            val matching = group.variants.filter { v ->
-                                v.itemName.contains(q, ignoreCase = true) ||
-                                    v.itemNameAr.contains(q, ignoreCase = true) ||
-                                    v.barcode.contains(q)
-                            }
-                            matching.ifEmpty { group.variants }
-                        }
+                        SmartSearchUtil.rankVariants(group.variants, searchQuery)
                     }
                     var visibleLimit by remember(group.id, expandedState, searchQuery) { mutableIntStateOf(15) }
                     val pageVariants = remember(displayedVariants, visibleLimit) {

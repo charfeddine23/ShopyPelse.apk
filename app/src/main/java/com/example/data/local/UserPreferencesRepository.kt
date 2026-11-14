@@ -41,7 +41,8 @@ data class AppPreferencesState(
     val hasSeededSpending: Boolean = false,
     val hasSeededCatalog: Boolean = false,
     val lastUpdateCheckTimestamp: Long = 0L,
-    val latestKnownVersion: String = ""
+    val latestKnownVersion: String = "",
+    val hasSeenTutorial: Boolean = false
 )
 
 interface AppPreferencesStorage {
@@ -67,6 +68,7 @@ interface AppPreferencesStorage {
     suspend fun setHasSeededCatalog(seeded: Boolean)
     suspend fun setLastUpdateCheckTimestamp(timestamp: Long)
     suspend fun setLatestKnownVersion(version: String)
+    suspend fun setHasSeenTutorial(seen: Boolean)
 }
 
 /**
@@ -103,6 +105,7 @@ class UserPreferencesRepository(context: Context) : AppPreferencesStorage {
         val HAS_SEEDED_CATALOG = booleanPreferencesKey("has_seeded_catalog")
         val LAST_UPDATE_CHECK_TS = longPreferencesKey("last_update_check_timestamp")
         val LATEST_KNOWN_VERSION = stringPreferencesKey("latest_known_version")
+        val HAS_SEEN_TUTORIAL = booleanPreferencesKey("has_seen_tutorial")
     }
 
     private val cachedFallback: AppPreferencesState by lazy { getInitialState() }
@@ -129,7 +132,8 @@ class UserPreferencesRepository(context: Context) : AppPreferencesStorage {
             hasSeededSpending = prefs[Keys.HAS_SEEDED_SPENDING] ?: fallback.hasSeededSpending,
             hasSeededCatalog = prefs[Keys.HAS_SEEDED_CATALOG] ?: fallback.hasSeededCatalog,
             lastUpdateCheckTimestamp = prefs[Keys.LAST_UPDATE_CHECK_TS] ?: fallback.lastUpdateCheckTimestamp,
-            latestKnownVersion = prefs[Keys.LATEST_KNOWN_VERSION] ?: fallback.latestKnownVersion
+            latestKnownVersion = prefs[Keys.LATEST_KNOWN_VERSION] ?: fallback.latestKnownVersion,
+            hasSeenTutorial = prefs[Keys.HAS_SEEN_TUTORIAL] ?: fallback.hasSeenTutorial
         )
     }
 
@@ -169,7 +173,8 @@ class UserPreferencesRepository(context: Context) : AppPreferencesStorage {
             hasSeededSpending = cachePrefs.getBoolean("has_seeded_spending", false),
             hasSeededCatalog = cachePrefs.getBoolean("has_seeded_catalog", false),
             lastUpdateCheckTimestamp = cachePrefs.getLong("last_update_check_timestamp", 0L),
-            latestKnownVersion = cachePrefs.getString("latest_known_version", "") ?: ""
+            latestKnownVersion = cachePrefs.getString("latest_known_version", "") ?: "",
+            hasSeenTutorial = cachePrefs.getBoolean("has_seen_tutorial", false)
         )
     }
 
@@ -277,6 +282,11 @@ class UserPreferencesRepository(context: Context) : AppPreferencesStorage {
         dataStore.edit { it[Keys.LATEST_KNOWN_VERSION] = version }
     }
 
+    override suspend fun setHasSeenTutorial(seen: Boolean) {
+        cachePrefs.edit().putBoolean("has_seen_tutorial", seen).apply()
+        dataStore.edit { it[Keys.HAS_SEEN_TUTORIAL] = seen }
+    }
+
     companion object {
         private const val CACHE_PREFS_NAME = "shopy_pulse_prefs_cache"
     }
@@ -311,4 +321,5 @@ class InMemoryPreferencesStorage(
     override suspend fun setHasSeededCatalog(seeded: Boolean) { state.value = state.value.copy(hasSeededCatalog = seeded) }
     override suspend fun setLastUpdateCheckTimestamp(timestamp: Long) { state.value = state.value.copy(lastUpdateCheckTimestamp = timestamp) }
     override suspend fun setLatestKnownVersion(version: String) { state.value = state.value.copy(latestKnownVersion = version) }
+    override suspend fun setHasSeenTutorial(seen: Boolean) { state.value = state.value.copy(hasSeenTutorial = seen) }
 }

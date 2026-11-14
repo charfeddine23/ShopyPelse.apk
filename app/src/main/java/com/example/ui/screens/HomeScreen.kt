@@ -136,6 +136,7 @@ import com.example.ui.viewmodel.ShoppingViewModel
 import com.example.util.LocalizationUtil
 import com.example.util.ProductGroup
 import com.example.util.ProductVariant
+import com.example.util.SmartSearchUtil
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1083,23 +1084,9 @@ fun AddItemSheetContent(
     var manualUnit by remember { mutableStateOf("pcs") }
     var manualPrice by remember { mutableDoubleStateOf(0.0) }
 
-    // Filter pre-grouped catalog products off the heavy grouping step
+    // Filter & rank product groups by search relevance (exact & closest matches first)
     val filteredGroups = remember(productGroups, productSearchQuery) {
-        if (productSearchQuery.isBlank()) {
-            productGroups
-        } else {
-            val q = productSearchQuery.trim()
-            productGroups.filter { group ->
-                group.nameAr.contains(q, ignoreCase = true) ||
-                group.nameEn.contains(q, ignoreCase = true) ||
-                group.category.contains(q, ignoreCase = true) ||
-                group.variants.any { v ->
-                    v.itemName.contains(q, ignoreCase = true) ||
-                    v.itemNameAr.contains(q, ignoreCase = true) ||
-                    v.barcode.contains(q)
-                }
-            }
-        }
+        SmartSearchUtil.searchAndRankGroups(productGroups, productSearchQuery)
     }
 
     val isLight = MaterialTheme.colorScheme.background == BackgroundLight

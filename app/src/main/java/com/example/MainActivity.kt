@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.view.WindowManager
 import com.example.ui.BaseActivity
 import com.example.util.ApkDownloadState
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -98,6 +99,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.data.local.AppDatabase
 import com.example.data.local.UserPreferencesRepository
 import com.example.data.repository.ShoppingRepository
+import com.example.ui.components.AppTutorialOverlay
 import com.example.ui.components.AppUpdateOverlay
 import com.example.ui.components.FluidWaterState
 import com.example.ui.components.LiquidGlassBackground
@@ -144,7 +146,11 @@ class MainActivity : BaseActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+        )
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
         val database = AppDatabase.getDatabase(applicationContext, lifecycleScope)
         val repository = ShoppingRepository(database.shoppingDao(), database.marketPriceDao(), database.spendingDao())
@@ -162,6 +168,31 @@ class MainActivity : BaseActivity() {
 
             // Dynamic Layout Direction: RTL (من اليمين لليسار) for Arabic, LTR for English
             val currentLayoutDirection = if (isArabic) LayoutDirection.Rtl else LayoutDirection.Ltr
+
+            LaunchedEffect(effectiveDarkMode) {
+                enableEdgeToEdge(
+                    statusBarStyle = if (effectiveDarkMode) {
+                        SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                    } else {
+                        SystemBarStyle.light(
+                            android.graphics.Color.TRANSPARENT,
+                            android.graphics.Color.TRANSPARENT
+                        )
+                    },
+                    navigationBarStyle = if (effectiveDarkMode) {
+                        SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                    } else {
+                        SystemBarStyle.light(
+                            android.graphics.Color.TRANSPARENT,
+                            android.graphics.Color.TRANSPARENT
+                        )
+                    }
+                )
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    window.isStatusBarContrastEnforced = false
+                    window.isNavigationBarContrastEnforced = false
+                }
+            }
 
             // Synchronize native window decorView direction dynamically
             LaunchedEffect(isArabic) {
@@ -197,17 +228,24 @@ class MainActivity : BaseActivity() {
     }
 
     private fun applyFullScreenStatusBar(enabled: Boolean) {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val lp = window.attributes
+            if (lp.layoutInDisplayCutoutMode != WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS) {
+                lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                window.attributes = lp
+            }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val lp = window.attributes
+            if (lp.layoutInDisplayCutoutMode != WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES) {
+                lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                window.attributes = lp
+            }
+        }
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         controller.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         if (enabled) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                val lp = window.attributes
-                if (lp.layoutInDisplayCutoutMode == WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT) {
-                    lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-                    window.attributes = lp
-                }
-            }
             controller.hide(WindowInsetsCompat.Type.statusBars())
         } else {
             controller.show(WindowInsetsCompat.Type.statusBars())
@@ -291,6 +329,7 @@ fun ShopyPulseApp(
     val updateStatus by viewModel.updateStatus.collectAsStateWithLifecycle()
     val showUpdateOverlay by viewModel.showUpdateOverlay.collectAsStateWithLifecycle()
     val apkDownloadState by viewModel.apkDownloadState.collectAsStateWithLifecycle()
+    val showTutorialOverlay by viewModel.showTutorialOverlay.collectAsStateWithLifecycle()
     var lastAutoInstallPath by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(apkDownloadState) {
@@ -548,6 +587,19 @@ fun ShopyPulseApp(
                     onCancelDownload = { viewModel.cancelUpdateDownload() }
                 )
             }
+        }
+
+        // Luxury Interactive App Tutorial Overlay
+        AnimatedVisibility(
+            visible = showTutorialOverlay && !(showUpdateOverlay && availableUpdate != null),
+            enter = fadeIn(tween(240)) + scaleIn(initialScale = 0.95f, animationSpec = tween(240)),
+            exit = fadeOut(tween(180))
+        ) {
+            AppTutorialOverlay(
+                isArabic = isArabic,
+                isDarkMode = isDarkMode,
+                onClose = { viewModel.completeTutorial() }
+            )
         }
     }
 }

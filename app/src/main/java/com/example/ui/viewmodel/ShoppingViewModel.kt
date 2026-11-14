@@ -120,19 +120,11 @@ class ShoppingViewModel(
         _searchQuery.debounce(100L),
         _selectedPriceCategory
     ) { groups, query, category ->
-        val q = query.trim()
-        groups.filter { group ->
-            val matchesCategory = category == "All" || group.category == category
-            val matchesSearch = q.isEmpty() ||
-                group.nameAr.contains(q, ignoreCase = true) ||
-                group.nameEn.contains(q, ignoreCase = true) ||
-                group.variants.any { v ->
-                    v.itemName.contains(q, ignoreCase = true) ||
-                        v.itemNameAr.contains(q, ignoreCase = true) ||
-                        v.barcode.contains(q)
-                }
-            matchesCategory && matchesSearch
-        }
+        com.example.util.SmartSearchUtil.searchAndRankGroups(
+            groups = groups,
+            query = query,
+            categoryFilter = category
+        )
     }
         .flowOn(Dispatchers.Default)
         .stateIn(
@@ -240,6 +232,26 @@ class ShoppingViewModel(
         _isTwoFingerFullScreenSwipeEnabled.value = enabled
         viewModelScope.launch {
             preferencesStorage.setTwoFingerFullScreenSwipeEnabled(enabled)
+        }
+    }
+
+    private val _hasSeenTutorial = MutableStateFlow(initialPrefs.hasSeenTutorial)
+    val hasSeenTutorial: StateFlow<Boolean> = _hasSeenTutorial.asStateFlow()
+
+    private val _showTutorialOverlay = MutableStateFlow(!initialPrefs.hasSeenTutorial)
+    val showTutorialOverlay: StateFlow<Boolean> = _showTutorialOverlay.asStateFlow()
+
+    fun openTutorial() {
+        _showTutorialOverlay.value = true
+    }
+
+    fun completeTutorial() {
+        _showTutorialOverlay.value = false
+        if (!_hasSeenTutorial.value) {
+            _hasSeenTutorial.value = true
+            viewModelScope.launch {
+                preferencesStorage.setHasSeenTutorial(true)
+            }
         }
     }
 

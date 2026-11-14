@@ -363,6 +363,17 @@ fun SettingsScreen(
                 )
             }
 
+            // 4c. Interactive App Tutorial Guide
+            item {
+                SingleActionNavButton(
+                    icon = Icons.Default.AutoAwesome,
+                    title = if (isArabic) "الدليل التفاعلي لشرح التطبيق" else "Interactive App Tutorial",
+                    accentColor = ElectricCyan,
+                    onClick = { viewModel.openTutorial() },
+                    testTag = "open_tutorial_button"
+                )
+            }
+
             // 5. App & Developer Info Section ("Developed by Kahlessenane Charfeddine")
             item {
                 DeveloperInfoSection(

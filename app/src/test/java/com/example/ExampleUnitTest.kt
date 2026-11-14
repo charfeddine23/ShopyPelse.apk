@@ -15,6 +15,9 @@ import com.example.ui.components.TwoFingerSwipeDirection
 import com.example.ui.viewmodel.ShoppingViewModel
 import com.example.util.AppUpdateChecker
 import com.example.util.LocalizationUtil
+import com.example.util.ProductGroup
+import com.example.util.ProductVariant
+import com.example.util.SmartSearchUtil
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -178,22 +181,152 @@ class ExampleUnitTest {
     @Test
     fun testSingleFingerPullUpDetector() {
         val slop = 18f
+        // Straight up and slight <=14 deg deviation pass
         assertTrue(SingleFingerPullUpDetector.isDominantUpwardDrag(dx = 12f, dy = -60f, touchSlopPx = slop))
+        // Diagonal (~22 deg) must NOT trigger strict pull-up
+        assertFalse(SingleFingerPullUpDetector.isDominantUpwardDrag(dx = 25f, dy = -60f, touchSlopPx = slop))
         assertFalse(SingleFingerPullUpDetector.isDominantUpwardDrag(dx = 0f, dy = -10f, touchSlopPx = slop))
         assertFalse(SingleFingerPullUpDetector.isDominantUpwardDrag(dx = 0f, dy = 60f, touchSlopPx = slop))
         assertFalse(SingleFingerPullUpDetector.isDominantUpwardDrag(dx = 90f, dy = -60f, touchSlopPx = slop))
 
         assertTrue(SingleFingerPullUpDetector.isAbandonedForOtherGesture(dx = 5f, dy = 50f, touchSlopPx = slop))
         assertTrue(SingleFingerPullUpDetector.isAbandonedForOtherGesture(dx = 60f, dy = -30f, touchSlopPx = slop))
+        assertTrue(SingleFingerPullUpDetector.isAbandonedForOtherGesture(dx = 25f, dy = -60f, touchSlopPx = slop))
         assertFalse(SingleFingerPullUpDetector.isAbandonedForOtherGesture(dx = 10f, dy = -60f, touchSlopPx = slop))
 
-        assertFalse(SingleFingerPullUpDetector.isTriggerThresholdReached(dy = -80f, thresholdPx = 120f))
-        assertTrue(SingleFingerPullUpDetector.isTriggerThresholdReached(dy = -120f, thresholdPx = 120f))
-        assertTrue(SingleFingerPullUpDetector.isTriggerThresholdReached(dy = -180f, thresholdPx = 120f))
+        assertFalse(SingleFingerPullUpDetector.isTriggerThresholdReached(dx = 0f, dy = -80f, thresholdPx = 120f))
+        assertFalse(SingleFingerPullUpDetector.isTriggerThresholdReached(dx = 45f, dy = -130f, thresholdPx = 120f))
+        assertTrue(SingleFingerPullUpDetector.isTriggerThresholdReached(dx = 15f, dy = -120f, thresholdPx = 120f))
+        assertTrue(SingleFingerPullUpDetector.isTriggerThresholdReached(dx = 0f, dy = -180f, thresholdPx = 120f))
 
         assertEquals(0f, SingleFingerPullUpDetector.computeVisualPullOffsetPx(dy = 40f, maxVisualPullPx = 90f), 0.01f)
         assertEquals(42f, SingleFingerPullUpDetector.computeVisualPullOffsetPx(dy = -100f, maxVisualPullPx = 90f), 0.01f)
         assertEquals(90f, SingleFingerPullUpDetector.computeVisualPullOffsetPx(dy = -350f, maxVisualPullPx = 90f), 0.01f)
+    }
+
+    @Test
+    fun testTutorialStateAndCompletion() {
+        val repo = ShoppingRepository(
+            shoppingDao = FakeShoppingDao(mutableListOf()),
+            marketPriceDao = FakeMarketPriceDao(),
+            spendingDao = FakeSpendingDao()
+        )
+        val vm = ShoppingViewModel(repo)
+        assertFalse(vm.hasSeenTutorial.value)
+        assertTrue(vm.showTutorialOverlay.value)
+
+        vm.completeTutorial()
+        assertTrue(vm.hasSeenTutorial.value)
+        assertFalse(vm.showTutorialOverlay.value)
+
+        vm.openTutorial()
+        assertTrue(vm.showTutorialOverlay.value)
+        vm.completeTutorial()
+        assertFalse(vm.showTutorialOverlay.value)
+    }
+
+    @Test
+    fun testSmartSearchRankingAndFuzzyMatching() {
+        val candiaPlain = ProductVariant(
+            barcode = "6130001",
+            itemName = "Candia Milk",
+            itemNameAr = "حليب كونديا",
+            storeName = "Uno",
+            storeNameAr = "أونو",
+            priceDzd = 135.0,
+            allPrices = emptyList()
+        )
+        val chocoDrink = ProductVariant(
+            barcode = "6130002",
+            itemName = "Kids Dessert with Candia Milk Powder",
+            itemNameAr = "حلوى بالحليب المجفف كونديا",
+            storeName = "Ardis",
+            storeNameAr = "أرديس",
+            priceDzd = 220.0,
+            allPrices = emptyList()
+        )
+        val riceVariant = ProductVariant(
+            barcode = "6130003",
+            itemName = "Basmati Rice 1kg",
+            itemNameAr = "أرز بسمتي 1 كلغ",
+            storeName = "Uno",
+            storeNameAr = "أونو",
+            priceDzd = 380.0,
+            allPrices = emptyList()
+        )
+        val oilVariant = ProductVariant(
+            barcode = "6130004",
+            itemName = "Elio Cooking Oil 5L",
+            itemNameAr = "زيت المائدة إيليو 5 لتر",
+            storeName = "Carrefour",
+            storeNameAr = "كارفور",
+            priceDzd = 620.0,
+            allPrices = emptyList()
+        )
+
+        val dessertGroup = ProductGroup(
+            id = "dessert",
+            nameAr = "حلويات بالحليب",
+            nameEn = "Milk Desserts",
+            category = "Dairy",
+            variants = listOf(chocoDrink),
+            minPrice = 220.0,
+            maxPrice = 220.0
+        )
+        val candiaGroup = ProductGroup(
+            id = "milk",
+            nameAr = "حليب كونديا",
+            nameEn = "Candia Milk",
+            category = "Dairy",
+            variants = listOf(chocoDrink, candiaPlain),
+            minPrice = 135.0,
+            maxPrice = 220.0
+        )
+        val riceGroup = ProductGroup(
+            id = "rice",
+            nameAr = "أرز بسمتي",
+            nameEn = "Basmati Rice",
+            category = "Pantry",
+            variants = listOf(riceVariant),
+            minPrice = 380.0,
+            maxPrice = 380.0
+        )
+        val oilGroup = ProductGroup(
+            id = "oil",
+            nameAr = "زيت المائدة",
+            nameEn = "Cooking Oil",
+            category = "Pantry",
+            variants = listOf(oilVariant),
+            minPrice = 620.0,
+            maxPrice = 620.0
+        )
+
+        val allGroups = listOf(dessertGroup, riceGroup, oilGroup, candiaGroup)
+
+        // Exact match must appear FIRST even if placed last in input list
+        val exactResults = SmartSearchUtil.searchAndRankGroups(allGroups, "Candia Milk")
+        assertEquals("milk", exactResults.first().id)
+        // Best matching variant inside group is also ordered first
+        assertEquals("6130001", exactResults.first().variants.first().barcode)
+
+        // Arabic normalization ("ارز" without hamza matches "أرز")
+        val arabicNormResults = SmartSearchUtil.searchAndRankGroups(allGroups, "ارز")
+        assertEquals(1, arabicNormResults.size)
+        assertEquals("rice", arabicNormResults.first().id)
+
+        // Typo tolerance ("canida" transposed letters matches "Candia Milk" first)
+        val fuzzyResults = SmartSearchUtil.searchAndRankGroups(allGroups, "canida")
+        assertTrue(fuzzyResults.isNotEmpty())
+        assertEquals("milk", fuzzyResults.first().id)
+
+        // Multi-token search ("زيت 5 لتر" out of adjacent order)
+        val tokenResults = SmartSearchUtil.searchAndRankGroups(allGroups, "زيت 5 لتر")
+        assertEquals(1, tokenResults.size)
+        assertEquals("oil", tokenResults.first().id)
+
+        // Exact variant ranking directly
+        val rankedVariants = SmartSearchUtil.rankVariants(listOf(chocoDrink, candiaPlain), "Candia Milk")
+        assertEquals("6130001", rankedVariants.first().barcode)
     }
 
     @Test
