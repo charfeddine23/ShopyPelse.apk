@@ -300,11 +300,12 @@ fun AppUpdateOverlay(
 
                         // In-App Download & Install Controls
                         AnimatedContent(
-                            targetState = apkDownloadState::class,
+                            targetState = apkDownloadState,
+                            contentKey = { it::class },
                             transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(150)) },
                             label = "update_action_state"
-                        ) { _ ->
-                            when (apkDownloadState) {
+                        ) { state ->
+                            when (state) {
                                 is ApkDownloadState.Idle -> {
                                     LuxuryUpdateActionButton(
                                         text = if (isArabic) "تحديث" else "Update",
@@ -317,7 +318,7 @@ fun AppUpdateOverlay(
 
                                 is ApkDownloadState.Downloading -> {
                                     CompactDownloadProgressSection(
-                                        state = apkDownloadState,
+                                        state = state,
                                         isArabic = isArabic,
                                         onCancel = onCancelDownload
                                     )
@@ -424,7 +425,7 @@ fun AppUpdateOverlay(
                                         horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
                                         Text(
-                                            text = if (isArabic) apkDownloadState.messageAr else apkDownloadState.messageEn,
+                                            text = if (isArabic) state.messageAr else state.messageEn,
                                             color = Color(0xFFFCA5A5),
                                             fontSize = 11.5.sp,
                                             textAlign = TextAlign.Center,

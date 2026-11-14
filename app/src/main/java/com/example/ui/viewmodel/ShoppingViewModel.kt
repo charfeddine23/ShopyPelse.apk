@@ -1,6 +1,7 @@
 package com.example.ui.viewmodel
 
 import android.content.Context
+import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -232,6 +233,16 @@ class ShoppingViewModel(
         }
     }
 
+    private val _isTwoFingerFullScreenSwipeEnabled = MutableStateFlow(initialPrefs.isTwoFingerFullScreenSwipeEnabled)
+    val isTwoFingerFullScreenSwipeEnabled: StateFlow<Boolean> = _isTwoFingerFullScreenSwipeEnabled.asStateFlow()
+
+    fun setTwoFingerFullScreenSwipeEnabled(enabled: Boolean) {
+        _isTwoFingerFullScreenSwipeEnabled.value = enabled
+        viewModelScope.launch {
+            preferencesStorage.setTwoFingerFullScreenSwipeEnabled(enabled)
+        }
+    }
+
     private val _updateStatus = MutableStateFlow<AppUpdateStatus>(AppUpdateStatus.Idle)
     val updateStatus: StateFlow<AppUpdateStatus> = _updateStatus.asStateFlow()
 
@@ -292,6 +303,8 @@ class ShoppingViewModel(
         }
     }
 
+
+
     fun startInAppUpdateDownload(
         context: Context,
         url: String = getUpdateUrl(),
@@ -303,9 +316,6 @@ class ShoppingViewModel(
         downloadJob = viewModelScope.launch {
             AppUpdateChecker.downloadApkInApp(appContext, url, versionLabel).collect { state ->
                 _apkDownloadState.value = state
-                if (state is ApkDownloadState.Downloaded) {
-                    installDownloadedApk(appContext, state.apkFile)
-                }
             }
         }
     }
@@ -317,11 +327,21 @@ class ShoppingViewModel(
             else -> null
         } ?: return
 
-        val launched = AppUpdateChecker.triggerApkInstall(context.applicationContext, targetFile)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
+            AppUpdateChecker.openInstallPermissionSettings(context)
+            _apkDownloadState.value = ApkDownloadState.RequiresInstallPermission(targetFile)
+            return
+        }
+
+        val launched = AppUpdateChecker.triggerApkInstall(context, targetFile)
         _apkDownloadState.value = if (launched) {
             ApkDownloadState.Downloaded(targetFile)
         } else {
-            ApkDownloadState.RequiresInstallPermission(targetFile)
+            ApkDownloadState.Failed(
+                messageAr = "تعذر فتح مثبت الحزم لتثبيت التحديث.",
+                messageEn = "Unable to launch package installer for this update.",
+                fallbackUrl = getUpdateUrl()
+            )
         }
     }
 
@@ -704,6 +724,8 @@ class ShoppingViewModel(
         root.put("isDarkMode", _isDarkMode.value)
         root.put("isDynamicGlowEnabled", _isDynamicGlowEnabled.value)
         root.put("isLiquidDockSwipeEnabled", _isLiquidDockSwipeEnabled.value)
+        root.put("isFullScreenEnabled", _isFullScreenEnabled.value)
+        root.put("isTwoFingerFullScreenSwipeEnabled", _isTwoFingerFullScreenSwipeEnabled.value)
         root.put("syncIntervalHours", _syncIntervalHours.value)
 
         val itemsArray = JSONArray()
@@ -794,6 +816,14 @@ class ShoppingViewModel(
                 }
                 if (root.has("isLiquidDockSwipeEnabled")) {
                     setLiquidDockSwipeEnabled(root.optBoolean("isLiquidDockSwipeEnabled", _isLiquidDockSwipeEnabled.value))
+                }
+                if (root.has("isFullScreenEnabled")) {
+                    setFullScreenEnabled(root.optBoolean("isFullScreenEnabled", _isFullScreenEnabled.value))
+                }
+                if (root.has("isTwoFingerFullScreenSwipeEnabled")) {
+                    setTwoFingerFullScreenSwipeEnabled(
+                        root.optBoolean("isTwoFingerFullScreenSwipeEnabled", _isTwoFingerFullScreenSwipeEnabled.value)
+                    )
                 }
                 if (root.has("syncIntervalHours")) {
                     val h = root.optInt("syncIntervalHours", _syncIntervalHours.value)

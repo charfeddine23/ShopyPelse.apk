@@ -28,6 +28,7 @@ data class AppPreferencesState(
     val isDynamicGlowEnabled: Boolean = true,
     val isLiquidDockSwipeEnabled: Boolean = true,
     val isFullScreenEnabled: Boolean = false,
+    val isTwoFingerFullScreenSwipeEnabled: Boolean = true,
     val budgetLimitDzd: Double = 3500.0,
     val lastBackupDate: String = "",
     val syncIntervalHours: Int = 12,
@@ -52,6 +53,7 @@ interface AppPreferencesStorage {
     suspend fun setDynamicGlowEnabled(enabled: Boolean)
     suspend fun setLiquidDockSwipeEnabled(enabled: Boolean)
     suspend fun setFullScreenEnabled(enabled: Boolean)
+    suspend fun setTwoFingerFullScreenSwipeEnabled(enabled: Boolean)
     suspend fun setBudgetLimitDzd(limit: Double)
     suspend fun setLastBackupDate(date: String)
     suspend fun setSyncIntervalHours(hours: Int)
@@ -87,6 +89,7 @@ class UserPreferencesRepository(context: Context) : AppPreferencesStorage {
         val IS_DYNAMIC_GLOW = booleanPreferencesKey("is_dynamic_glow_enabled")
         val IS_LIQUID_DOCK_SWIPE = booleanPreferencesKey("is_liquid_dock_swipe_enabled")
         val IS_FULL_SCREEN = booleanPreferencesKey("is_full_screen_enabled")
+        val IS_TWO_FINGER_FULL_SCREEN_SWIPE = booleanPreferencesKey("is_two_finger_full_screen_swipe_enabled")
         val BUDGET_LIMIT_DZD = doublePreferencesKey("budget_limit_dzd")
         val LAST_BACKUP_DATE = stringPreferencesKey("last_backup_date")
         val SYNC_INTERVAL_HOURS = intPreferencesKey("sync_interval_hours")
@@ -113,6 +116,7 @@ class UserPreferencesRepository(context: Context) : AppPreferencesStorage {
             isDynamicGlowEnabled = prefs[Keys.IS_DYNAMIC_GLOW] ?: fallback.isDynamicGlowEnabled,
             isLiquidDockSwipeEnabled = prefs[Keys.IS_LIQUID_DOCK_SWIPE] ?: fallback.isLiquidDockSwipeEnabled,
             isFullScreenEnabled = prefs[Keys.IS_FULL_SCREEN] ?: fallback.isFullScreenEnabled,
+            isTwoFingerFullScreenSwipeEnabled = prefs[Keys.IS_TWO_FINGER_FULL_SCREEN_SWIPE] ?: fallback.isTwoFingerFullScreenSwipeEnabled,
             budgetLimitDzd = prefs[Keys.BUDGET_LIMIT_DZD] ?: fallback.budgetLimitDzd,
             lastBackupDate = prefs[Keys.LAST_BACKUP_DATE] ?: fallback.lastBackupDate,
             syncIntervalHours = prefs[Keys.SYNC_INTERVAL_HOURS] ?: fallback.syncIntervalHours,
@@ -147,6 +151,7 @@ class UserPreferencesRepository(context: Context) : AppPreferencesStorage {
             isDynamicGlowEnabled = cachePrefs.getBoolean("is_dynamic_glow_enabled", true),
             isLiquidDockSwipeEnabled = cachePrefs.getBoolean("is_liquid_dock_swipe_enabled", true),
             isFullScreenEnabled = cachePrefs.getBoolean("is_full_screen_enabled", false),
+            isTwoFingerFullScreenSwipeEnabled = cachePrefs.getBoolean("is_two_finger_full_screen_swipe_enabled", true),
             budgetLimitDzd = java.lang.Double.longBitsToDouble(
                 cachePrefs.getLong(
                     "budget_limit_dzd_bits",
@@ -198,6 +203,11 @@ class UserPreferencesRepository(context: Context) : AppPreferencesStorage {
     override suspend fun setFullScreenEnabled(enabled: Boolean) {
         cachePrefs.edit().putBoolean("is_full_screen_enabled", enabled).apply()
         dataStore.edit { it[Keys.IS_FULL_SCREEN] = enabled }
+    }
+
+    override suspend fun setTwoFingerFullScreenSwipeEnabled(enabled: Boolean) {
+        cachePrefs.edit().putBoolean("is_two_finger_full_screen_swipe_enabled", enabled).apply()
+        dataStore.edit { it[Keys.IS_TWO_FINGER_FULL_SCREEN_SWIPE] = enabled }
     }
 
     override suspend fun setBudgetLimitDzd(limit: Double) {
@@ -287,6 +297,7 @@ class InMemoryPreferencesStorage(
     override suspend fun setDynamicGlowEnabled(enabled: Boolean) { state.value = state.value.copy(isDynamicGlowEnabled = enabled) }
     override suspend fun setLiquidDockSwipeEnabled(enabled: Boolean) { state.value = state.value.copy(isLiquidDockSwipeEnabled = enabled) }
     override suspend fun setFullScreenEnabled(enabled: Boolean) { state.value = state.value.copy(isFullScreenEnabled = enabled) }
+    override suspend fun setTwoFingerFullScreenSwipeEnabled(enabled: Boolean) { state.value = state.value.copy(isTwoFingerFullScreenSwipeEnabled = enabled) }
     override suspend fun setBudgetLimitDzd(limit: Double) { state.value = state.value.copy(budgetLimitDzd = limit) }
     override suspend fun setLastBackupDate(date: String) { state.value = state.value.copy(lastBackupDate = date) }
     override suspend fun setSyncIntervalHours(hours: Int) { state.value = state.value.copy(syncIntervalHours = hours) }

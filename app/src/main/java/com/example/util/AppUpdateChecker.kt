@@ -1,5 +1,7 @@
 package com.example.util
 
+import android.app.Activity
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -66,10 +68,9 @@ sealed class ApkDownloadState {
 
 object AppUpdateChecker {
 
-    const val UPDATE_URL = "https://github.com/charfeddine23/ShopyPelse.apk"
+    const val UPDATE_URL = "https://github.com/charfeddine23/Shopy"
     private val REPO_SLUGS = listOf(
-        "charfeddine23/ShopyPelse.apk",
-        "charfeddine23/ShopyPelse"
+        "charfeddine23/Shopy"
     )
     private val RELEASE_API_ENDPOINTS = REPO_SLUGS.map {
         "https://api.github.com/repos/$it/releases/latest"
@@ -102,7 +103,8 @@ object AppUpdateChecker {
             host == "api.github.com" ||
             host.endsWith(".github.com") ||
             host == "githubusercontent.com" ||
-            host.endsWith(".githubusercontent.com")
+            host.endsWith(".githubusercontent.com") ||
+            (host.startsWith("github-production-release-asset-") && host.endsWith(".amazonaws.com"))
     }
 
     suspend fun checkForUpdate(currentVersionName: String): AppUpdateStatus = withContext(Dispatchers.IO) {
@@ -293,6 +295,36 @@ object AppUpdateChecker {
                 }
             } catch (_: Exception) {}
         }
+        // Try repository tree (supports APKs in subfolders like release/ or dist/)
+        for (slug in REPO_SLUGS) {
+            try {
+                val req = Request.Builder()
+                    .url("https://api.github.com/repos/$slug/git/trees/HEAD?recursive=1")
+                    .header("Accept", "application/vnd.github+json")
+                    .header("User-Agent", "ShopyPulse-Android")
+                    .build()
+                client.newCall(req).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val body = resp.body?.string()
+                        if (!body.isNullOrBlank()) {
+                            val obj = JSONObject(body)
+                            val tree = obj.optJSONArray("tree") ?: return@use
+                            for (i in 0 until tree.length()) {
+                                val entry = tree.optJSONObject(i) ?: continue
+                                val type = entry.optString("type", "")
+                                val path = entry.optString("path", "")
+                                if (type == "blob" && path.endsWith(".apk", ignoreCase = true)) {
+                                    val candidate = "https://raw.githubusercontent.com/$slug/HEAD/$path"
+                                    if (isTrustedUpdateUrl(candidate)) {
+                                        return candidate
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
         return null
     }
 
@@ -328,13 +360,23 @@ object AppUpdateChecker {
             }
 
             // If URL is the repository homepage or not yet a direct binary link, resolve the real APK asset inside the app
-            val effectiveUrl = if (
-                downloadUrl.equals(UPDATE_URL, ignoreCase = true) ||
+            val isHomepageUrl = downloadUrl.equals(UPDATE_URL, ignoreCase = true) ||
                 downloadUrl.equals("$UPDATE_URL/", ignoreCase = true)
-            ) {
-                resolveApkUrlFromGithub() ?: downloadUrl
+            val effectiveUrl = if (isHomepageUrl) {
+                resolveApkUrlFromGithub()
             } else {
                 downloadUrl
+            }
+
+            if (effectiveUrl.isNullOrBlank()) {
+                emit(
+                    ApkDownloadState.Failed(
+                        messageAr = "لم يتم العثور على ملف APK مباشر في مستودع التحديثات بعد.",
+                        messageEn = "No direct APK file was found in the update repository yet.",
+                        fallbackUrl = UPDATE_URL
+                    )
+                )
+                return@flow
             }
 
             if (!isTrustedUpdateUrl(effectiveUrl)) {
@@ -352,6 +394,7 @@ object AppUpdateChecker {
                 .url(effectiveUrl)
                 .header("User-Agent", "ShopyPulse-Android")
                 .header("Accept", "application/vnd.android.package-archive, application/octet-stream, */*")
+                .header("Accept-Encoding", "identity")
                 .build()
 
             client.newCall(request).execute().use { response ->
@@ -427,7 +470,6 @@ object AppUpdateChecker {
                             if (read == -1) break
 
                             if (downloadedBytes + read > MAX_APK_SIZE_BYTES) {
-                                output.close()
                                 targetFile.delete()
                                 emit(
                                     ApkDownloadState.Failed(
@@ -443,7 +485,6 @@ object AppUpdateChecker {
                             if (!checkedMagic && read >= 2) {
                                 checkedMagic = true
                                 if (buffer[0] != 0x50.toByte() || buffer[1] != 0x4B.toByte()) {
-                                    output.close()
                                     targetFile.delete()
                                     emit(
                                         ApkDownloadState.Failed(
@@ -486,14 +527,14 @@ object AppUpdateChecker {
                     }
                 }
 
-                // Validate archive packageName matches current applicationId before offering install
+                // Validate that the downloaded file is a parseable Android APK archive
                 val archiveInfo = context.packageManager.getPackageArchiveInfo(targetFile.absolutePath, 0)
-                if (archiveInfo == null || archiveInfo.packageName != context.packageName) {
+                if (archiveInfo == null || archiveInfo.packageName.isNullOrBlank()) {
                     targetFile.delete()
                     emit(
                         ApkDownloadState.Failed(
-                            messageAr = "حزمة التحديث لا تطابق هوية التطبيق وتم رفضها أمنياً.",
-                            messageEn = "Downloaded APK does not match app package ID.",
+                            messageAr = "الملف المحمل تالف أو ليس حزمة تطبيق أندرويد صالحة.",
+                            messageEn = "Downloaded file is corrupted or not a valid Android APK.",
                             fallbackUrl = effectiveUrl
                         )
                     )
@@ -521,9 +562,27 @@ object AppUpdateChecker {
         }
     }.flowOn(Dispatchers.IO)
 
+    fun openInstallPermissionSettings(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
+        val permIntent = Intent(
+            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+            Uri.parse("package:${context.packageName}")
+        ).apply {
+            if (context !is Activity) {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        }
+        return try {
+            context.startActivity(permIntent)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     /**
      * Triggers Android's package installer for the downloaded APK using FileProvider.
-     * Returns true if installer intent was launched, false if user needs to grant install permission first.
+     * Returns true if installer intent was launched, false if launch failed or permission is needed.
      */
     fun triggerApkInstall(context: Context, apkFile: File): Boolean {
         val updatesDir = File(context.cacheDir, "updates")
@@ -537,38 +596,54 @@ object AppUpdateChecker {
         if (!isInsideUpdatesDir) return false
 
         val archiveInfo = context.packageManager.getPackageArchiveInfo(apkFile.absolutePath, 0)
-        if (archiveInfo == null || archiveInfo.packageName != context.packageName) {
+        if (archiveInfo == null || archiveInfo.packageName.isNullOrBlank()) {
             return false
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
-            val permIntent = Intent(
-                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                Uri.parse("package:${context.packageName}")
-            ).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            try {
-                context.startActivity(permIntent)
-            } catch (_: Exception) {}
+            openInstallPermissionSettings(context)
             return false
         }
 
-        return try {
-            val apkUri = FileProvider.getUriForFile(
+        val apkUri = try {
+            FileProvider.getUriForFile(
                 context,
                 "${context.packageName}.fileprovider",
                 apkFile
             )
-            val installIntent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(apkUri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            context.startActivity(installIntent)
-            true
         } catch (_: Exception) {
-            false
+            return false
+        }
+
+        val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(apkUri, "application/vnd.android.package-archive")
+            clipData = ClipData.newRawUri("", apkUri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            if (context !is Activity) {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        }
+        try {
+            context.startActivity(viewIntent)
+            return true
+        } catch (_: Exception) {
+            @Suppress("DEPRECATION")
+            val installPkgIntent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+                data = apkUri
+                clipData = ClipData.newRawUri("", apkUri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                putExtra(Intent.EXTRA_RETURN_RESULT, false)
+                if (context !is Activity) {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            }
+            return try {
+                context.startActivity(installPkgIntent)
+                true
+            } catch (_: Exception) {
+                false
+            }
         }
     }
 

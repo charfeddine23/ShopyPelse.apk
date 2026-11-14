@@ -42,9 +42,9 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.PagerSnapDistance
@@ -79,10 +79,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -105,6 +107,7 @@ import com.example.ui.components.fluidWaterDistortion
 import com.example.ui.components.fluidWaterTouchPhysics
 import com.example.ui.components.rememberFluidWaterState
 import com.example.ui.components.rememberPagerSwipeBlockController
+import com.example.ui.components.twoFingerFullScreenSwipe
 import com.example.util.AppUpdateStatus
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.PriceComparisonScreen
@@ -200,7 +203,7 @@ class MainActivity : BaseActivity() {
         if (enabled) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 val lp = window.attributes
-                if (lp.layoutInDisplayCutoutMode != WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES) {
+                if (lp.layoutInDisplayCutoutMode == WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT) {
                     lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
                     window.attributes = lp
                 }
@@ -256,15 +259,26 @@ fun ShopyPulseApp(
         }
     }
 
-    // Preserve the exact top status bar spacing so only the background extends when Full Screen hides the top bar
+    // Lock the top status-bar space permanently for this orientation so toggling Full Screen ON or OFF
+    // only shows/hides the system bar over the background without moving any screen content.
     val visibleStatusTopPx = WindowInsets.statusBars.getTop(density)
     val stableStatusTopPx = WindowInsets.statusBarsIgnoringVisibility.getTop(density)
-    var cachedStatusBarTopPx by remember(configuration.orientation) { mutableIntStateOf(0) }
-    val resolvedStableTopPx = maxOf(visibleStatusTopPx, stableStatusTopPx)
-    if (resolvedStableTopPx > cachedStatusBarTopPx) {
-        cachedStatusBarTopPx = resolvedStableTopPx
+    val cutoutTopPx = WindowInsets.displayCutout.getTop(density)
+    val fallbackStatusBarTopPx = remember(context, configuration.orientation) {
+        val resId = context.resources.getIdentifier("status_bar_height", "dimen", "android")
+        if (resId > 0) context.resources.getDimensionPixelSize(resId) else 0
     }
-    val preservedTopPaddingDp = with(density) { maxOf(stableStatusTopPx, cachedStatusBarTopPx).toDp() }
+    var cachedStatusBarTopPx by remember(configuration.orientation) { mutableIntStateOf(0) }
+    val resolvedMeasuredTopPx = maxOf(visibleStatusTopPx, stableStatusTopPx, cutoutTopPx)
+    if (resolvedMeasuredTopPx > cachedStatusBarTopPx) {
+        cachedStatusBarTopPx = resolvedMeasuredTopPx
+    }
+    val effectiveTopPx = if (cachedStatusBarTopPx > 0) {
+        cachedStatusBarTopPx
+    } else {
+        fallbackStatusBarTopPx
+    }
+    val preservedTopPaddingDp = with(density) { effectiveTopPx.toDp() }
     val currentScreenName by viewModel.currentScreenName.collectAsStateWithLifecycle()
     val currentScreen = remember(currentScreenName) {
         Screen.entries.firstOrNull { it.name == currentScreenName } ?: Screen.HOME
@@ -272,9 +286,21 @@ fun ShopyPulseApp(
     var showQrShareDialog by remember { mutableStateOf(false) }
     val isArabic by viewModel.isArabic.collectAsStateWithLifecycle()
     val isFluidWaterEnabled by viewModel.isLiquidDockSwipeEnabled.collectAsStateWithLifecycle()
+    val isTwoFingerFullScreenSwipeEnabled by viewModel.isTwoFingerFullScreenSwipeEnabled.collectAsStateWithLifecycle()
+    val haptic = LocalHapticFeedback.current
     val updateStatus by viewModel.updateStatus.collectAsStateWithLifecycle()
     val showUpdateOverlay by viewModel.showUpdateOverlay.collectAsStateWithLifecycle()
     val apkDownloadState by viewModel.apkDownloadState.collectAsStateWithLifecycle()
+    var lastAutoInstallPath by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(apkDownloadState) {
+        val downloaded = apkDownloadState as? ApkDownloadState.Downloaded ?: return@LaunchedEffect
+        val path = downloaded.apkFile.absolutePath
+        if (lastAutoInstallPath != path) {
+            lastAutoInstallPath = path
+            viewModel.installDownloadedApk(context, downloaded.apkFile)
+        }
+    }
 
     // Primary ViewPager screens (Home <-> Products <-> Settings)
     val pagerScreens = remember { listOf(Screen.HOME, Screen.PRICES, Screen.SETTINGS) }
@@ -383,13 +409,32 @@ fun ShopyPulseApp(
             },
             modifier = Modifier
                 .fillMaxSize()
-                .then(
-                    if (isFullScreen) {
-                        Modifier.padding(top = preservedTopPaddingDp)
-                    } else {
-                        Modifier.statusBarsPadding()
+                .twoFingerFullScreenSwipe(
+                    enabled = isTwoFingerFullScreenSwipeEnabled,
+                    onSwipeUp = {
+                        if (!isFullScreen) {
+                            try {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            } catch (_: Exception) {}
+                            viewModel.setFullScreenEnabled(true)
+                            viewModel.emitUserMessage(
+                                if (isArabic) "تم تفعيل وضع ملء الشاشة" else "Full Screen Enabled"
+                            )
+                        }
+                    },
+                    onSwipeDown = {
+                        if (isFullScreen) {
+                            try {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            } catch (_: Exception) {}
+                            viewModel.setFullScreenEnabled(false)
+                            viewModel.emitUserMessage(
+                                if (isArabic) "تم إيقاف وضع ملء الشاشة" else "Full Screen Disabled"
+                            )
+                        }
                     }
                 )
+                .padding(top = preservedTopPaddingDp)
         ) { innerPadding ->
             CompositionLocalProvider(
                 LocalPagerSwipeBlockController provides pagerSwipeBlockController

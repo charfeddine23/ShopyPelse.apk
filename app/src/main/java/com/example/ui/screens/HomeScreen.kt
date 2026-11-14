@@ -2,6 +2,14 @@ package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -81,11 +89,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -95,10 +105,12 @@ import com.example.data.model.ShoppingItem
 import com.example.ui.components.GlowingActionButton
 import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.NeonBadge
+import com.example.ui.components.PullUpGestureState
 import com.example.ui.components.SwipeToDeleteContainer
 import com.example.ui.components.WindGlowAppNameBanner
 import com.example.ui.components.disableParentPagerSwipe
 import com.example.ui.components.horizontalFadingEdge
+import com.example.ui.components.singleFingerPullUpToAdd
 import com.example.ui.theme.BackgroundLight
 import com.example.ui.theme.CheckedGreen
 import com.example.ui.theme.CyanTintBg
@@ -948,10 +960,46 @@ private fun EmptyListCard(
     isArabic: Boolean,
     onAddItem: () -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
+    var pullState by remember { mutableStateOf(PullUpGestureState()) }
+    val animatedPullPx by animateFloatAsState(
+        targetValue = if (pullState.isDragging) pullState.pullOffsetPx else 0f,
+        animationSpec = if (pullState.isDragging) {
+            spring(stiffness = Spring.StiffnessHigh)
+        } else {
+            spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow)
+        },
+        label = "empty_list_pull_up_offset"
+    )
+    val hintTransition = rememberInfiniteTransition(label = "pull_up_hint")
+    val arrowNudgeDp by hintTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = -4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 850, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pull_up_arrow_nudge"
+    )
+
     LiquidGlassCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp)
+            .singleFingerPullUpToAdd(
+                enabled = true,
+                onStateChanged = { pullState = it },
+                onThresholdReachedHaptic = {
+                    try {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    } catch (_: Exception) {}
+                },
+                onTriggered = onAddItem
+            )
+            .graphicsLayer {
+                translationY = -animatedPullPx
+            }
+            .testTag("empty_shopping_list_card")
     ) {
         Column(
             modifier = Modifier
@@ -962,7 +1010,7 @@ private fun EmptyListCard(
             Icon(
                 imageVector = Icons.Default.ShoppingCart,
                 contentDescription = null,
-                tint = ElectricCyan.copy(alpha = 0.6f),
+                tint = ElectricCyan.copy(alpha = if (pullState.isThresholdReached) 0.95f else 0.6f),
                 modifier = Modifier.size(56.dp)
             )
             Spacer(modifier = Modifier.height(14.dp))
@@ -970,24 +1018,47 @@ private fun EmptyListCard(
                 text = if (isArabic) "قائمة التسوق فارغة" else "Shopping List is Empty",
                 color = TextPrimary,
                 fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = if (isArabic) {
-                    "أضف عناصر يدوياً أو اختر من العناصر الشائعة أعلاه"
+                    "اسحب للأعلى بإصبع واحد لإضافة المنتجات أو اختر من العناصر الشائعة أعلاه"
                 } else {
-                    "Add items manually or tap a frequent item above"
+                    "Pull up with one finger to add items or tap a frequent item above"
                 },
                 color = TextSecondary,
-                fontSize = 13.sp
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(18.dp))
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowUp,
+                contentDescription = null,
+                tint = if (pullState.isThresholdReached) EmeraldSavings else ElectricCyan,
+                modifier = Modifier
+                    .size(22.dp)
+                    .graphicsLayer {
+                        translationY = if (pullState.isDragging) {
+                            (-pullState.progress * 6f).dp.toPx()
+                        } else {
+                            arrowNudgeDp.dp.toPx()
+                        }
+                    }
+            )
+            Spacer(modifier = Modifier.height(4.dp))
             GlowingActionButton(
-                text = if (isArabic) "إضافة عنصر جديد" else "Add New Item",
-                icon = Icons.Default.Add,
+                text = when {
+                    pullState.isThresholdReached && isArabic -> "أفلت لإضافة المنتجات"
+                    pullState.isThresholdReached -> "Release to add items"
+                    isArabic -> "اسحب للأعلى لإضافة المنتجات"
+                    else -> "Pull up to add items"
+                },
+                icon = Icons.Default.KeyboardArrowUp,
                 onClick = onAddItem,
-                color = ElectricCyan
+                color = if (pullState.isThresholdReached) EmeraldSavings else ElectricCyan,
+                modifier = Modifier.testTag("pull_up_add_items_button")
             )
         }
     }

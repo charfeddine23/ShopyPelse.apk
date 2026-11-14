@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.SwipeVertical
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Verified
@@ -135,6 +136,7 @@ fun SettingsScreen(
     val isDynamicGlowEnabled by viewModel.isDynamicGlowEnabled.collectAsStateWithLifecycle()
     val isLiquidDockSwipeEnabled by viewModel.isLiquidDockSwipeEnabled.collectAsStateWithLifecycle()
     val isFullScreenEnabled by viewModel.isFullScreenEnabled.collectAsStateWithLifecycle()
+    val isTwoFingerFullScreenSwipeEnabled by viewModel.isTwoFingerFullScreenSwipeEnabled.collectAsStateWithLifecycle()
     val updateStatus by viewModel.updateStatus.collectAsStateWithLifecycle()
     val apkDownloadState by viewModel.apkDownloadState.collectAsStateWithLifecycle()
 
@@ -302,6 +304,17 @@ fun SettingsScreen(
                     isArabic = isArabic,
                     onToggleChange = { enabled ->
                         viewModel.setFullScreenEnabled(enabled)
+                    }
+                )
+            }
+
+            // 2e. Two-Finger Swipe Full Screen Gesture Toggle
+            item {
+                TwoFingerFullScreenSwipeToggleSection(
+                    isEnabled = isTwoFingerFullScreenSwipeEnabled,
+                    isArabic = isArabic,
+                    onToggleChange = { enabled ->
+                        viewModel.setTwoFingerFullScreenSwipeEnabled(enabled)
                     }
                 )
             }
@@ -911,6 +924,83 @@ private fun FullScreenToggleSection(
                 checkedIcon = Icons.Default.Fullscreen,
                 uncheckedIcon = Icons.Default.FullscreenExit,
                 modifier = Modifier.testTag("full_screen_switch")
+            )
+        }
+    }
+}
+
+/**
+ * 2e. Two-Finger Swipe Gesture Toggle Section for Full Screen Mode
+ */
+@Composable
+private fun TwoFingerFullScreenSwipeToggleSection(
+    isEnabled: Boolean,
+    isArabic: Boolean,
+    onToggleChange: (Boolean) -> Unit
+) {
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+
+    NeumorphicGlassCard(
+        modifier = Modifier.fillMaxWidth(),
+        glowColor = if (isEnabled) ElectricCyan.copy(alpha = 0.30f) else Color.Transparent
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 11.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(if (isEnabled) ElectricCyan.copy(alpha = 0.15f) else Color(0x18777777)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SwipeVertical,
+                        contentDescription = null,
+                        tint = if (isEnabled) ElectricCyan else TextSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Column {
+                    Text(
+                        text = if (isArabic) "السحب بإصبعين لملء الشاشة" else "Two-Finger Full Screen Swipe",
+                        color = TextPrimary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = if (isArabic) {
+                            "اسحب بإصبعين للأعلى للتفعيل وللأسفل للإلغاء"
+                        } else {
+                            "Swipe 2 fingers up to enable, down to exit"
+                        },
+                        color = if (isEnabled) ElectricCyan else TextSecondary,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            NeumorphicGlowingSwitch(
+                checked = isEnabled,
+                onCheckedChange = onToggleChange,
+                activeColor = ElectricCyan,
+                inactiveColor = if (isLight) Color(0xFFCBD5E1) else Color(0xFF475569),
+                checkedIcon = Icons.Default.SwipeVertical,
+                uncheckedIcon = Icons.Default.SwipeVertical,
+                modifier = Modifier.testTag("two_finger_fullscreen_swipe_switch")
             )
         }
     }
