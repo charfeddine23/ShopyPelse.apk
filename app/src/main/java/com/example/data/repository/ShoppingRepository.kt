@@ -1,16 +1,20 @@
 package com.example.data.repository
 
+import com.example.data.local.AppDatabase
+import com.example.data.local.DatabaseInitialData
 import com.example.data.local.MarketPriceDao
 import com.example.data.local.ShoppingDao
 import com.example.data.local.SpendingDao
-import com.example.data.local.DatabaseInitialData
 import com.example.data.model.MarketPrice
 import com.example.data.model.PriceHistory
 import com.example.data.model.ShoppingItem
 import com.example.data.model.SpendingRecord
 import com.example.data.model.StoreBasketSummary
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 class ShoppingRepository(
     private val shoppingDao: ShoppingDao,
@@ -27,11 +31,12 @@ class ShoppingRepository(
 
     suspend fun ensureSpendingSeeded(alreadySeeded: Boolean): Boolean {
         if (alreadySeeded) return true
-        val records = spendingDao.getAllSpendingRecords().first()
-        if (records.isEmpty()) {
-            spendingDao.insertSpendingRecords(DatabaseInitialData.initialSpendingRecords)
+        return AppDatabase.seedMutex.withLock {
+            if (spendingDao.getSpendingRecordCount() == 0) {
+                spendingDao.insertSpendingRecords(DatabaseInitialData.initialSpendingRecords)
+            }
+            true
         }
-        return true
     }
 
     suspend fun insertItem(item: ShoppingItem): Long {
@@ -42,17 +47,30 @@ class ShoppingRepository(
             item.category
         }
 
+        val sanitizedPrice = if (item.estimatedPriceDzd.isFinite()) item.estimatedPriceDzd.coerceAtLeast(0.0) else 0.0
         // If barcode exists, try to enrich estimated price from best store
-        val estimatedPrice = if (item.barcode != null && item.estimatedPriceDzd <= 0.0) {
+        val estimatedPrice = if (item.barcode != null && sanitizedPrice <= 0.0) {
             val best = marketPriceDao.getBestPriceForBarcode(item.barcode)
             best?.priceDzd ?: 0.0
         } else {
-            item.estimatedPriceDzd
+            sanitizedPrice
         }
 
         return shoppingDao.insertItem(
-            item.copy(category = category, estimatedPriceDzd = estimatedPrice)
+            item.copy(
+                name = item.name.trim(),
+                nameAr = item.nameAr.trim().ifBlank { item.name.trim() },
+                category = category,
+                quantity = item.quantity.coerceIn(1, 999),
+                estimatedPriceDzd = estimatedPrice
+            )
         )
+    }
+
+    suspend fun insertItems(items: List<ShoppingItem>) {
+        if (items.isNotEmpty()) {
+            shoppingDao.insertItems(items)
+        }
     }
 
     suspend fun sanitizeExistingItemCategories() {
@@ -73,9 +91,11 @@ class ShoppingRepository(
 
     suspend fun toggleChecked(id: Long, isChecked: Boolean) = shoppingDao.updateCheckedStatus(id, isChecked)
 
-    suspend fun updateQuantity(id: Long, quantity: Int) = shoppingDao.updateQuantity(id, quantity)
+    suspend fun updateQuantity(id: Long, quantity: Int) = shoppingDao.updateQuantity(id, quantity.coerceIn(1, 999))
 
     suspend fun clearCheckedItems() = shoppingDao.deleteCheckedItems()
+
+    suspend fun clearAllItems() = shoppingDao.clearAll()
 
     suspend fun getItemByBarcode(barcode: String): ShoppingItem? = shoppingDao.getItemByBarcode(barcode)
 
@@ -90,13 +110,15 @@ class ShoppingRepository(
 
     suspend fun ensureCatalogPopulated(alreadySeeded: Boolean): Boolean {
         if (alreadySeeded) return true
-        val currentPrices = marketPriceDao.getAllMarketPrices().first()
-        if (currentPrices.size < 4900) {
-            val catalog5000 = com.example.data.local.CatalogDataGenerator.generate5000Products()
-            val marketPrices5000 = com.example.data.local.CatalogDataGenerator.generateMarketPricesForCatalog(catalog5000)
-            marketPriceDao.insertMarketPrices(marketPrices5000)
+        return AppDatabase.seedMutex.withLock {
+            val count = marketPriceDao.getMarketPriceCount()
+            if (count < 4900) {
+                val catalog5000 = com.example.data.local.CatalogDataGenerator.generate5000Products()
+                val marketPrices5000 = com.example.data.local.CatalogDataGenerator.generateMarketPricesForCatalog(catalog5000)
+                marketPriceDao.insertMarketPrices(marketPrices5000)
+            }
+            true
         }
-        return true
     }
 
     suspend fun addNewProductPrice(
@@ -107,14 +129,15 @@ class ShoppingRepository(
         priceDzd: Double,
         barcode: String? = null
     ): String {
+        val safePrice = if (priceDzd.isFinite()) priceDzd.coerceAtLeast(1.0) else 50.0
         val finalBarcode = if (!barcode.isNullOrBlank()) barcode else (6130000000000L + (System.currentTimeMillis() % 1000000000L)).toString()
         val marketPrice = MarketPrice(
             barcode = finalBarcode,
-            itemName = name,
-            itemNameAr = nameAr,
+            itemName = name.trim(),
+            itemNameAr = nameAr.trim().ifBlank { name.trim() },
             storeName = storeName,
             storeNameAr = storeNameAr,
-            priceDzd = priceDzd,
+            priceDzd = safePrice,
             verifiedCount = 1
         )
         marketPriceDao.insertMarketPrice(marketPrice)
@@ -122,6 +145,7 @@ class ShoppingRepository(
     }
 
     suspend fun updateProductPrice(barcode: String, storeName: String?, newPrice: Double) {
+        if (!newPrice.isFinite() || newPrice <= 0.0) return
         if (storeName.isNullOrBlank()) {
             marketPriceDao.updatePriceForBarcode(barcode, newPrice)
         } else {
@@ -135,6 +159,7 @@ class ShoppingRepository(
     }
 
     suspend fun reportCrowdsourcedPrice(barcode: String, storeName: String, storeNameAr: String, itemName: String, newPrice: Double) {
+        if (!newPrice.isFinite() || newPrice <= 0.0) return
         val existing = marketPriceDao.getPriceForBarcodeAndStore(barcode, storeName)
         if (existing != null) {
             marketPriceDao.updatePriceReport(barcode, storeName, newPrice)
@@ -155,34 +180,42 @@ class ShoppingRepository(
 
     /**
      * Total Basket Price Comparison:
-     * Evaluates all shopping items across known supermarkets.
-     * Highlights the cheapest store with the Emerald Green "Best Value" badge.
+     * Evaluates all shopping items across known supermarkets on Dispatchers.Default
+     * using pre-indexed HashMaps for O(1) lookup per item.
      */
-    suspend fun computeBasketComparison(items: List<ShoppingItem>): List<StoreBasketSummary> {
-        if (items.isEmpty()) return emptyList()
+    suspend fun computeBasketComparison(items: List<ShoppingItem>): List<StoreBasketSummary> = withContext(Dispatchers.Default) {
+        if (items.isEmpty()) return@withContext emptyList()
 
         val allPrices = marketPriceDao.getAllMarketPrices().first()
-        val storeNames = allPrices.map { it.storeName to it.storeNameAr }.distinct()
+        if (allPrices.isEmpty()) return@withContext emptyList()
 
-        val summaries = storeNames.map { (storeName, storeNameAr) ->
+        val stores = LinkedHashMap<String, String>()
+        val byStoreAndBarcode = HashMap<String, HashMap<String, MarketPrice>>()
+        val byStoreAndName = HashMap<String, HashMap<String, MarketPrice>>()
+
+        for (p in allPrices) {
+            stores.putIfAbsent(p.storeName, p.storeNameAr)
+            byStoreAndBarcode.getOrPut(p.storeName) { HashMap() }.putIfAbsent(p.barcode, p)
+            val nameMap = byStoreAndName.getOrPut(p.storeName) { HashMap() }
+            nameMap.putIfAbsent(p.itemName.lowercase(), p)
+            nameMap.putIfAbsent(p.itemNameAr.lowercase(), p)
+        }
+
+        val summaries = stores.map { (storeName, storeNameAr) ->
+            val barcodeMap = byStoreAndBarcode[storeName]
+            val nameMap = byStoreAndName[storeName]
             var storeTotal = 0.0
             var foundCount = 0
 
             for (item in items) {
-                // Find store-specific price for this item's barcode or item name
-                val priceObj = allPrices.firstOrNull { p ->
-                    p.storeName == storeName && (
-                        (item.barcode != null && p.barcode == item.barcode) ||
-                        p.itemName.equals(item.name, ignoreCase = true) ||
-                        p.itemNameAr.equals(item.nameAr, ignoreCase = true)
-                    )
-                }
+                val priceObj = (item.barcode?.let { barcodeMap?.get(it) })
+                    ?: nameMap?.get(item.name.lowercase())
+                    ?: nameMap?.get(item.nameAr.lowercase())
 
                 if (priceObj != null) {
                     storeTotal += (priceObj.priceDzd * item.quantity)
                     foundCount++
                 } else {
-                    // Fallback to estimated price if not explicitly in store catalog
                     storeTotal += (item.estimatedPriceDzd * item.quantity)
                 }
             }
@@ -197,12 +230,12 @@ class ShoppingRepository(
             )
         }
 
-        if (summaries.isEmpty()) return emptyList()
+        if (summaries.isEmpty()) return@withContext emptyList()
 
         val minTotal = summaries.minOf { it.totalDzd }
         val maxTotal = summaries.maxOf { it.totalDzd }
 
-        return summaries.map { summary ->
+        summaries.map { summary ->
             val isCheapest = summary.totalDzd == minTotal && minTotal > 0.0
             val savings = if (maxTotal > summary.totalDzd) maxTotal - summary.totalDzd else 0.0
             summary.copy(isBestValue = isCheapest, savingsComparedToMaxDzd = savings)
@@ -378,33 +411,61 @@ class ShoppingRepository(
         }
     }
 
+    private fun sanitizeQrField(value: String): String =
+        value.replace(";", " ")
+            .replace("~", " ")
+            .replace("|", " ")
+            .replace("\r", " ")
+            .replace("\n", " ")
+            .trim()
+            .take(120)
+
     /**
      * Serializes items for QR offline sharing
      * Format: SOUK|name;nameAr;category;quantity;unit;barcode;estimatedPrice
      */
     fun createQrShareString(items: List<ShoppingItem>): String {
-        val payload = items.joinToString("~") { item ->
-            "${item.name};${item.nameAr};${item.category};${item.quantity};${item.unit};${item.barcode ?: ""};${item.estimatedPriceDzd}"
+        val payload = items.take(250).joinToString("~") { item ->
+            val name = sanitizeQrField(item.name)
+            val nameAr = sanitizeQrField(item.nameAr)
+            val category = sanitizeQrField(item.category).ifBlank { "Pantry" }
+            val unit = sanitizeQrField(item.unit).ifBlank { "pcs" }
+            val barcode = sanitizeQrField(item.barcode ?: "")
+            val qty = item.quantity.coerceIn(1, 999)
+            val price = if (item.estimatedPriceDzd.isFinite()) item.estimatedPriceDzd.coerceIn(0.0, 10_000_000.0) else 0.0
+            "$name;$nameAr;$category;$qty;$unit;$barcode;$price"
         }
         return "SOUK|$payload"
     }
 
     suspend fun importFromQrString(qrData: String): Int {
-        if (!qrData.startsWith("SOUK|")) return 0
-        val payload = qrData.substringAfter("SOUK|")
-        val itemTokens = payload.split("~")
+        val trimmed = qrData.trim()
+        if (!trimmed.startsWith("SOUK|") || trimmed.length > 64_000) return 0
+        val payload = trimmed.substringAfter("SOUK|")
+        if (payload.isBlank()) return 0
+        val itemTokens = payload.split("~").take(250)
         var count = 0
         for (token in itemTokens) {
             val parts = token.split(";")
             if (parts.size >= 4) {
+                val rawName = parts[0].trim().take(120)
+                if (rawName.isBlank()) continue
+                val rawNameAr = parts.getOrNull(1)?.trim()?.take(120)?.ifBlank { rawName } ?: rawName
+                val rawCategory = parts.getOrNull(2)?.trim()?.take(40)?.ifBlank { "Pantry" } ?: "Pantry"
+                val safeQty = (parts.getOrNull(3)?.trim()?.toIntOrNull() ?: 1).coerceIn(1, 999)
+                val safeUnit = parts.getOrNull(4)?.trim()?.take(24)?.ifBlank { "pcs" } ?: "pcs"
+                val safeBarcode = parts.getOrNull(5)?.trim()?.take(64)?.ifBlank { null }
+                val rawPrice = parts.getOrNull(6)?.trim()?.toDoubleOrNull() ?: 0.0
+                val safePrice = if (rawPrice.isFinite()) rawPrice.coerceIn(0.0, 10_000_000.0) else 0.0
+
                 val item = ShoppingItem(
-                    name = parts[0],
-                    nameAr = parts.getOrNull(1)?.ifBlank { parts[0] } ?: parts[0],
-                    category = parts.getOrNull(2) ?: "Pantry",
-                    quantity = parts.getOrNull(3)?.toIntOrNull() ?: 1,
-                    unit = parts.getOrNull(4)?.ifBlank { "pcs" } ?: "pcs",
-                    barcode = parts.getOrNull(5)?.ifBlank { null },
-                    estimatedPriceDzd = parts.getOrNull(6)?.toDoubleOrNull() ?: 0.0,
+                    name = rawName,
+                    nameAr = rawNameAr,
+                    category = rawCategory,
+                    quantity = safeQty,
+                    unit = safeUnit,
+                    barcode = safeBarcode,
+                    estimatedPriceDzd = safePrice,
                     isChecked = false
                 )
                 insertItem(item)

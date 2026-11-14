@@ -62,6 +62,7 @@ fun CircularRevealThemeOverlay(
 
     val glowColor = if (isTargetDark) ElectricCyan else NeonAmber
     val secondaryGlow = if (isTargetDark) EmeraldSavings else CyanTintBorder
+    val clipPath = remember { Path() }
 
     Canvas(
         modifier = Modifier
@@ -80,9 +81,8 @@ fun CircularRevealThemeOverlay(
         val currentRadius = progress.value * maxRadius
         if (currentRadius <= 0f) return@Canvas
 
-        val clipPath = Path().apply {
-            addOval(Rect(effectiveCenter, currentRadius))
-        }
+        clipPath.reset()
+        clipPath.addOval(Rect(effectiveCenter, currentRadius))
 
         // 1. Draw Revealed Background with subtle soft glass aurora gradient
         clipPath(clipPath) {

@@ -62,11 +62,16 @@ import com.example.ui.components.GlowingActionButton
 import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.NeonBadge
 import com.example.ui.components.SwipeToDeleteContainer
+import com.example.ui.theme.BackgroundLight
 import com.example.ui.theme.CheckedGreen
+import com.example.ui.theme.CyanTintBg
+import com.example.ui.theme.CyanTintBorder
+import com.example.ui.theme.CyanTintText
 import com.example.ui.theme.ElectricCyan
 import com.example.ui.theme.EmeraldSavings
 import com.example.ui.theme.GlassBorder
 import com.example.ui.theme.GlassSurface
+import com.example.ui.theme.LightCardBorder
 import com.example.ui.theme.NeonAmber
 import com.example.ui.theme.NeonRed
 import com.example.ui.theme.TextMuted
@@ -84,6 +89,7 @@ fun SupermarketModeScreen(
     val items by viewModel.shoppingItems.collectAsStateWithLifecycle()
     val isArabic by viewModel.isArabic.collectAsStateWithLifecycle()
     val budgetLimit by viewModel.budgetLimitDzd.collectAsStateWithLifecycle()
+    val isLight = androidx.compose.material3.MaterialTheme.colorScheme.background == BackgroundLight
 
     var showEditBudgetDialog by remember { mutableStateOf(false) }
     var hideChecked by remember { mutableStateOf(false) }
@@ -276,15 +282,16 @@ fun SupermarketModeScreen(
         }
 
         // Bottom Done bar
+        val bottomFadeColors = if (isLight) {
+            listOf(Color.Transparent, Color(0xF0F2F6F9), BackgroundLight)
+        } else {
+            listOf(Color.Transparent, Color(0xF00B0E14), Color(0xFF0B0E14))
+        }
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.Transparent, Color(0xF00B0E14), Color(0xFF0B0E14))
-                    )
-                )
+                .background(Brush.verticalGradient(bottomFadeColors))
                 .padding(16.dp)
         ) {
             GlowingActionButton(
@@ -304,7 +311,7 @@ fun SupermarketModeScreen(
         var newBudgetText by remember { mutableStateOf(budgetLimit.toInt().toString()) }
         AlertDialog(
             onDismissRequest = { showEditBudgetDialog = false },
-            containerColor = Color(0xFF131B2A),
+            containerColor = if (isLight) Color.White else Color(0xFF131B2A),
             title = {
                 Text(
                     text = if (isArabic) "تحديد ميزانية التسوق" else "Set Shopping Budget",
@@ -349,7 +356,7 @@ fun SupermarketModeScreen(
     if (showFinishDialog) {
         AlertDialog(
             onDismissRequest = { showFinishDialog = false },
-            containerColor = Color(0xFF131B2A),
+            containerColor = if (isLight) Color.White else Color(0xFF131B2A),
             title = {
                 Text(
                     text = if (isArabic) "اكتملت جولة التسوق بنجاح!" else "Shopping Completed!",
@@ -405,6 +412,9 @@ private fun SupermarketModeHeader(
     onToggleHideChecked: () -> Unit,
     onFinishShopping: () -> Unit
 ) {
+    val isLight = androidx.compose.material3.MaterialTheme.colorScheme.background == BackgroundLight
+    val filterActiveColor = if (isLight) CyanTintText else ElectricCyan
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -417,7 +427,11 @@ private fun SupermarketModeHeader(
                 onClick = onBack,
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(Color(0x33FFFFFF))
+                    .background(if (isLight) Color.White else Color(0x33FFFFFF))
+                    .border(
+                        BorderStroke(1.dp, if (isLight) LightCardBorder else Color.Transparent),
+                        CircleShape
+                    )
                     .size(42.dp)
                     .testTag("supermarket_back_button")
             ) {
@@ -454,9 +468,22 @@ private fun SupermarketModeHeader(
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(12.dp))
-                .background(if (hideChecked) ElectricCyan.copy(alpha = 0.25f) else Color(0x20FFFFFF))
+                .background(
+                    if (hideChecked) {
+                        if (isLight) CyanTintBg else ElectricCyan.copy(alpha = 0.25f)
+                    } else {
+                        if (isLight) Color.White else Color(0x20FFFFFF)
+                    }
+                )
                 .border(
-                    BorderStroke(1.dp, if (hideChecked) ElectricCyan else GlassBorder),
+                    BorderStroke(
+                        1.dp,
+                        if (hideChecked) {
+                            if (isLight) CyanTintBorder else ElectricCyan
+                        } else {
+                            GlassBorder
+                        }
+                    ),
                     RoundedCornerShape(12.dp)
                 )
                 .clickable(onClick = onToggleHideChecked)
@@ -468,7 +495,7 @@ private fun SupermarketModeHeader(
                 } else {
                     if (isArabic) "إخفاء المكتمل" else "Hide Done"
                 },
-                color = if (hideChecked) ElectricCyan else TextSecondary,
+                color = if (hideChecked) filterActiveColor else TextSecondary,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -520,7 +547,7 @@ fun SupermarketItemCard(
                     .border(
                         BorderStroke(
                             2.5.dp,
-                            if (item.isChecked) CheckedGreen else Color(0x80FFFFFF)
+                            if (item.isChecked) CheckedGreen else if (isLight) Color(0xFFCBD5E1) else Color(0x80FFFFFF)
                         ),
                         CircleShape
                     )
@@ -569,7 +596,7 @@ fun SupermarketItemCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "${item.quantity} ${item.unit}",
-                        color = ElectricCyan,
+                        color = if (isLight) CyanTintText else ElectricCyan,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -591,7 +618,7 @@ fun SupermarketItemCard(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0x331C283E))
+                    .background(if (isLight) Color(0xFFF1F5F9) else Color(0x331C283E))
                     .padding(horizontal = 4.dp, vertical = 4.dp)
             ) {
                 Box(

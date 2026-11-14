@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,6 +37,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudDone
@@ -64,6 +67,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -104,8 +108,10 @@ import com.example.BuildConfig
 import com.example.ui.viewmodel.ShoppingViewModel
 import com.example.util.ApkDownloadState
 import com.example.util.AppUpdateStatus
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 
 /**
  * Production-ready Settings Screen for 'Shopy Pulse' matching the Dark Slate
@@ -121,7 +127,10 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val isArabic by viewModel.isArabic.collectAsStateWithLifecycle()
-    val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
+    val isDarkModePref by viewModel.isDarkMode.collectAsStateWithLifecycle()
+    val isAutoThemeEnabled by viewModel.isAutoThemeEnabled.collectAsStateWithLifecycle()
+    val systemInDark = isSystemInDarkTheme()
+    val isEffectiveDarkMode = if (isAutoThemeEnabled) systemInDark else isDarkModePref
     val lastBackupDate by viewModel.lastBackupDate.collectAsStateWithLifecycle()
     val isDynamicGlowEnabled by viewModel.isDynamicGlowEnabled.collectAsStateWithLifecycle()
     val isLiquidDockSwipeEnabled by viewModel.isLiquidDockSwipeEnabled.collectAsStateWithLifecycle()
@@ -132,9 +141,11 @@ fun SettingsScreen(
     var showQrDialog by remember { mutableStateOf(false) }
     var qrDialogInitialMode by remember { mutableStateOf(false) }
     var showDriveDialog by remember { mutableStateOf(false) }
+    val ioScope = rememberCoroutineScope()
 
-    // Circular Reveal animation states for Light/Dark mode transition
+    // Circular Reveal animation states for Light/Dark/Auto mode transition
     var revealTargetDark by remember { mutableStateOf<Boolean?>(null) }
+    var revealTargetAuto by remember { mutableStateOf<Boolean?>(null) }
     var switchCenterOffset by remember { mutableStateOf(Offset.Zero) }
 
     // Storage Access Framework Launcher to save backup file (Google Drive / local)
@@ -142,13 +153,23 @@ fun SettingsScreen(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri: Uri? ->
         if (uri != null) {
-            try {
-                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                    outputStream.write(viewModel.generateGoogleDriveBackupPayload().toByteArray())
+            ioScope.launch {
+                val payload = viewModel.generateGoogleDriveBackupPayload()
+                val saved = withContext(Dispatchers.IO) {
+                    runCatching {
+                        context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                            outputStream.write(payload.toByteArray(Charsets.UTF_8))
+                            outputStream.flush()
+                        } ?: error("Output stream unavailable")
+                    }.isSuccess
                 }
-                viewModel.markGoogleDriveBackupDone()
-            } catch (e: Exception) {
-                e.printStackTrace()
+                if (saved) {
+                    viewModel.markGoogleDriveBackupDone()
+                } else {
+                    viewModel.emitUserMessage(
+                        if (isArabic) "تعذر حفظ ملف النسخ الاحتياطي" else "Unable to save backup file"
+                    )
+                }
             }
         }
     }
@@ -158,14 +179,34 @@ fun SettingsScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
-            try {
-                context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                    val reader = BufferedReader(InputStreamReader(inputStream))
-                    val content = reader.readText()
-                    viewModel.restoreFromBackupPayload(content)
+            ioScope.launch {
+                val readResult = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val maxBytes = 2 * 1024 * 1024
+                        context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                            val buffer = ByteArray(8192)
+                            val out = ByteArrayOutputStream()
+                            var totalRead = 0
+                            while (true) {
+                                val read = inputStream.read(buffer)
+                                if (read == -1) break
+                                totalRead += read
+                                if (totalRead > maxBytes) {
+                                    throw IllegalArgumentException("Backup file too large")
+                                }
+                                out.write(buffer, 0, read)
+                            }
+                            out.toString(Charsets.UTF_8.name())
+                        }
+                    }.getOrNull()
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
+                if (readResult != null) {
+                    viewModel.restoreFromBackupPayload(readResult)
+                } else {
+                    viewModel.emitUserMessage(
+                        if (isArabic) "ملف النسخة الاحتياطية غير صالح أو كبير جداً" else "Backup file is invalid or too large"
+                    )
+                }
             }
         }
     }
@@ -173,7 +214,7 @@ fun SettingsScreen(
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Screen Header (without back arrow, title strictly on one line)
@@ -193,16 +234,37 @@ fun SettingsScreen(
                 )
             }
 
-            // 2. Theme Mode Section (with Custom Glowing Switch Toggle)
+            // 2. Theme Mode Section (with Custom Glowing Switch Toggle + Auto System Sync Button)
             item {
                 ThemeModeSection(
-                    isDarkMode = isDarkMode,
+                    isDarkMode = isEffectiveDarkMode,
+                    isAutoTheme = isAutoThemeEnabled,
                     isArabic = isArabic,
                     onDarkModeChange = { darkSelected ->
-                        if (revealTargetDark == null && darkSelected != isDarkMode) {
-                            revealTargetDark = darkSelected
-                        } else if (revealTargetDark == null) {
-                            viewModel.setDarkMode(darkSelected)
+                        if (revealTargetDark == null) {
+                            if (darkSelected != isEffectiveDarkMode) {
+                                revealTargetAuto = false
+                                revealTargetDark = darkSelected
+                            } else {
+                                viewModel.setAutoThemeEnabled(false)
+                                viewModel.setDarkMode(darkSelected)
+                            }
+                        }
+                    },
+                    onAutoToggle = {
+                        if (revealTargetDark == null) {
+                            val nextAuto = !isAutoThemeEnabled
+                            if (nextAuto) {
+                                if (systemInDark != isEffectiveDarkMode) {
+                                    revealTargetAuto = true
+                                    revealTargetDark = systemInDark
+                                } else {
+                                    viewModel.setAutoThemeEnabled(true)
+                                }
+                            } else {
+                                viewModel.setDarkMode(isEffectiveDarkMode)
+                                viewModel.setAutoThemeEnabled(false)
+                            }
                         }
                     },
                     onSwitchPositionChanged = { center ->
@@ -329,16 +391,22 @@ fun SettingsScreen(
             )
         }
 
-        // Circular Reveal Transition Animation Overlay for Light/Dark Mode Switch
-        if (revealTargetDark != null) {
+        // Circular Reveal Transition Animation Overlay for Light/Dark/Auto Mode Switch
+        val pendingTargetDark = revealTargetDark
+        if (pendingTargetDark != null) {
+            val pendingTargetAuto = revealTargetAuto
             CircularRevealThemeOverlay(
-                isTargetDark = revealTargetDark!!,
+                isTargetDark = pendingTargetDark,
                 center = switchCenterOffset,
                 onMiddlePoint = {
-                    viewModel.setDarkMode(revealTargetDark!!)
+                    if (pendingTargetAuto != null) {
+                        viewModel.setAutoThemeEnabled(pendingTargetAuto)
+                    }
+                    viewModel.setDarkMode(pendingTargetDark)
                 },
                 onAnimationEnd = {
                     revealTargetDark = null
+                    revealTargetAuto = null
                 }
             )
         }
@@ -477,18 +545,27 @@ private fun CompactLanguagePill(
 /**
  * 2. Theme Mode Section
  * Includes custom glowing switch toggle for instant Night/Day mode switching
- * in a compact container.
+ * plus an Auto button alongside it for automatic system theme following.
  */
 @Composable
 private fun ThemeModeSection(
     isDarkMode: Boolean,
+    isAutoTheme: Boolean,
     isArabic: Boolean,
     onDarkModeChange: (Boolean) -> Unit,
+    onAutoToggle: () -> Unit,
     onSwitchPositionChanged: (Offset) -> Unit = {}
 ) {
+    val isLight = MaterialTheme.colorScheme.background == BackgroundLight
+    val accentColor = when {
+        isAutoTheme -> EmeraldSavings
+        isDarkMode -> ElectricCyan
+        else -> NeonAmber
+    }
+
     Column {
         SectionHeader(
-            icon = if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
+            icon = if (isAutoTheme) Icons.Default.BrightnessAuto else if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
             title = if (isArabic) "المظهر والسمات" else "Theme & Mode",
             accentColor = NeonAmber
         )
@@ -497,12 +574,12 @@ private fun ThemeModeSection(
 
         NeumorphicGlassCard(
             modifier = Modifier.fillMaxWidth(),
-            glowColor = if (isDarkMode) ElectricCyan.copy(alpha = 0.30f) else NeonAmber.copy(alpha = 0.30f)
+            glowColor = accentColor.copy(alpha = 0.30f)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 11.dp),
+                    .padding(horizontal = 14.dp, vertical = 7.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -514,42 +591,120 @@ private fun ThemeModeSection(
                         modifier = Modifier
                             .size(32.dp)
                             .clip(RoundedCornerShape(9.dp))
-                            .background(if (isDarkMode) ElectricCyan.copy(alpha = 0.15f) else NeonAmber.copy(alpha = 0.15f)),
+                            .background(accentColor.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
+                            imageVector = when {
+                                isAutoTheme -> Icons.Default.BrightnessAuto
+                                isDarkMode -> Icons.Default.DarkMode
+                                else -> Icons.Default.LightMode
+                            },
                             contentDescription = null,
-                            tint = if (isDarkMode) ElectricCyan else NeonAmber,
+                            tint = accentColor,
                             modifier = Modifier.size(17.dp)
                         )
                     }
 
                     Spacer(modifier = Modifier.width(10.dp))
 
-                    Text(
-                        text = if (isDarkMode) {
-                            if (isArabic) "الوضع الليلي" else "Night Mode"
-                        } else {
-                            if (isArabic) "الوضع النهاري" else "Day Mode"
-                        },
-                        color = TextPrimary,
-                        fontSize = 14.5.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Column {
+                        Text(
+                            text = when {
+                                isAutoTheme && isArabic -> "تلقائي"
+                                isAutoTheme -> "Auto"
+                                isDarkMode && isArabic -> "الوضع الليلي"
+                                isDarkMode -> "Night Mode"
+                                isArabic -> "الوضع النهاري"
+                                else -> "Day Mode"
+                            },
+                            color = TextPrimary,
+                            fontSize = 14.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (isAutoTheme) {
+                            Text(
+                                text = if (isArabic) "حسب وضع الهاتف" else "Follows system",
+                                color = EmeraldSavings,
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
                 }
 
-                // Custom Switch Toggle with Glowing Active State
-                NeumorphicGlowingSwitch(
-                    checked = isDarkMode,
-                    onCheckedChange = onDarkModeChange,
-                    activeColor = ElectricCyan,
-                    inactiveColor = NeonAmber,
-                    checkedIcon = Icons.Default.DarkMode,
-                    uncheckedIcon = Icons.Default.LightMode,
-                    onPositionChanged = onSwitchPositionChanged,
-                    modifier = Modifier.testTag("theme_switch_toggle")
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    // Auto Button (48dp min accessible target with compact 32dp pill)
+                    Box(
+                        modifier = Modifier
+                            .defaultMinSize(minWidth = 56.dp, minHeight = 48.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = ripple(bounded = true, color = EmeraldSavings),
+                                onClick = onAutoToggle
+                            )
+                            .testTag("theme_auto_button"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .height(32.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(
+                                    if (isAutoTheme) {
+                                        EmeraldSavings.copy(alpha = 0.22f)
+                                    } else if (isLight) {
+                                        Color(0xFFE2E8F0)
+                                    } else {
+                                        Color(0x330B111E)
+                                    }
+                                )
+                                .border(
+                                    BorderStroke(
+                                        width = if (isAutoTheme) 1.5.dp else 1.dp,
+                                        color = if (isAutoTheme) {
+                                            EmeraldSavings
+                                        } else if (isLight) {
+                                            Color(0xFFCBD5E1)
+                                        } else {
+                                            Color(0x44FFFFFF)
+                                        }
+                                    ),
+                                    RoundedCornerShape(16.dp)
+                                )
+                                .padding(horizontal = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Auto",
+                                color = if (isAutoTheme) {
+                                    if (isLight) Color(0xFF047857) else EmeraldSavings
+                                } else {
+                                    TextSecondary
+                                },
+                                fontSize = 12.sp,
+                                fontWeight = if (isAutoTheme) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                maxLines = 1
+                            )
+                        }
+                    }
+
+                    // Custom Switch Toggle with Glowing Active State
+                    NeumorphicGlowingSwitch(
+                        checked = isDarkMode,
+                        onCheckedChange = onDarkModeChange,
+                        activeColor = ElectricCyan,
+                        inactiveColor = NeonAmber,
+                        checkedIcon = Icons.Default.DarkMode,
+                        uncheckedIcon = Icons.Default.LightMode,
+                        onPositionChanged = onSwitchPositionChanged,
+                        modifier = Modifier.testTag("theme_switch_toggle")
+                    )
+                }
             }
         }
     }
@@ -1250,18 +1405,20 @@ private fun DeveloperInfoSection(
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = ShoppingViewModel.DEVELOPER_NAME,
+                                text = "Developed By Charfeddine Ka",
                                 color = TextPrimary,
-                                fontSize = 16.sp,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = (-0.3).sp
+                                letterSpacing = (-0.2).sp,
+                                maxLines = 2,
+                                modifier = Modifier.weight(1f, fill = false)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(5.dp))
                             Icon(
                                 imageVector = Icons.Default.Verified,
                                 contentDescription = "Verified",
                                 tint = EmeraldSavings,
-                                modifier = Modifier.size(17.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                         Spacer(modifier = Modifier.height(2.dp))

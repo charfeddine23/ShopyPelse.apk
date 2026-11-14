@@ -19,6 +19,9 @@ interface MarketPriceDao {
     @Query("SELECT * FROM market_prices ORDER BY priceDzd ASC")
     fun getAllMarketPrices(): Flow<List<MarketPrice>>
 
+    @Query("SELECT COUNT(*) FROM market_prices")
+    suspend fun getMarketPriceCount(): Int
+
     @Query("SELECT * FROM market_prices WHERE barcode = :barcode ORDER BY priceDzd ASC LIMIT 1")
     suspend fun getBestPriceForBarcode(barcode: String): MarketPrice?
 

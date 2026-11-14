@@ -11,6 +11,8 @@ import com.example.data.model.ShoppingItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 import com.example.data.model.SpendingRecord
 
@@ -27,6 +29,8 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
+
+        val seedMutex = Mutex()
 
         fun getDatabase(context: Context, scope: CoroutineScope): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -57,15 +61,20 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         suspend fun populateDatabase(shoppingDao: ShoppingDao, marketPriceDao: MarketPriceDao, spendingDao: SpendingDao) {
-            shoppingDao.insertItems(DatabaseInitialData.initialShoppingItems)
-            marketPriceDao.insertMarketPrices(DatabaseInitialData.initialMarketPrices)
-            marketPriceDao.insertPriceHistories(DatabaseInitialData.initialPriceHistories)
-            spendingDao.insertSpendingRecords(DatabaseInitialData.initialSpendingRecords)
+            seedMutex.withLock {
+                if (marketPriceDao.getMarketPriceCount() > 0) return@withLock
+                shoppingDao.insertItems(DatabaseInitialData.initialShoppingItems)
+                marketPriceDao.insertMarketPrices(DatabaseInitialData.initialMarketPrices)
+                marketPriceDao.insertPriceHistories(DatabaseInitialData.initialPriceHistories)
+                if (spendingDao.getSpendingRecordCount() == 0) {
+                    spendingDao.insertSpendingRecords(DatabaseInitialData.initialSpendingRecords)
+                }
 
-            // Insert 5,000 realistic Algerian grocery and supermarket products
-            val catalog5000 = CatalogDataGenerator.generate5000Products()
-            val marketPrices5000 = CatalogDataGenerator.generateMarketPricesForCatalog(catalog5000)
-            marketPriceDao.insertMarketPrices(marketPrices5000)
+                // Insert 5,000 realistic Algerian grocery and supermarket products
+                val catalog5000 = CatalogDataGenerator.generate5000Products()
+                val marketPrices5000 = CatalogDataGenerator.generateMarketPricesForCatalog(catalog5000)
+                marketPriceDao.insertMarketPrices(marketPrices5000)
+            }
         }
     }
 }

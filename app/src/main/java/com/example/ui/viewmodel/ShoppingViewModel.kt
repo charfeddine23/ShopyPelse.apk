@@ -18,6 +18,10 @@ import com.example.util.ApkDownloadState
 import com.example.util.AppUpdateChecker
 import com.example.util.AppUpdateStatus
 import com.example.util.LocalizationUtil
+import com.example.util.ProductGroup
+import com.example.util.ProductGroupingUtil
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,8 +31,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -36,6 +43,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@OptIn(FlowPreview::class)
 class ShoppingViewModel(
     private val repository: ShoppingRepository,
     private val preferencesStorage: AppPreferencesStorage = InMemoryPreferencesStorage()
@@ -47,6 +55,8 @@ class ShoppingViewModel(
             get() = "v${BuildConfig.VERSION_NAME} Build ${BuildConfig.VERSION_CODE}"
         const val LAST_UPDATE_DATE_AR = "09/11/2026"
         const val LAST_UPDATE_DATE_EN = "09/11/2026"
+        private const val MAX_BACKUP_JSON_LENGTH = 2_000_000
+        private const val MAX_BACKUP_ITEMS = 500
     }
 
     val shoppingItems: StateFlow<List<ShoppingItem>> = repository.allShoppingItems
@@ -57,6 +67,29 @@ class ShoppingViewModel(
         )
 
     val marketPrices: StateFlow<List<MarketPrice>> = repository.allMarketPrices
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    private val customBarcodeCategories = MutableStateFlow<Map<String, String>>(emptyMap())
+
+    val productGroups: StateFlow<List<ProductGroup>> = combine(
+        marketPrices,
+        customBarcodeCategories
+    ) { prices, overrides ->
+        val grouped = ProductGroupingUtil.groupMarketPrices(prices)
+        if (overrides.isEmpty()) {
+            grouped
+        } else {
+            grouped.map { grp ->
+                val matchedCat = grp.variants.firstNotNullOfOrNull { overrides[it.barcode] }
+                if (matchedCat != null && matchedCat.isNotBlank()) grp.copy(category = matchedCat) else grp
+            }
+        }
+    }
+        .flowOn(Dispatchers.Default)
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -75,8 +108,37 @@ class ShoppingViewModel(
     private val _selectedCategory = MutableStateFlow(initialPrefs.selectedCategory)
     val selectedCategory: StateFlow<String> = _selectedCategory.asStateFlow()
 
+    private val _selectedPriceCategory = MutableStateFlow("All")
+    val selectedPriceCategory: StateFlow<String> = _selectedPriceCategory.asStateFlow()
+
     private val _searchQuery = MutableStateFlow(initialPrefs.searchQuery)
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    val filteredProductGroups: StateFlow<List<ProductGroup>> = combine(
+        productGroups,
+        _searchQuery.debounce(100L),
+        _selectedPriceCategory
+    ) { groups, query, category ->
+        val q = query.trim()
+        groups.filter { group ->
+            val matchesCategory = category == "All" || group.category == category
+            val matchesSearch = q.isEmpty() ||
+                group.nameAr.contains(q, ignoreCase = true) ||
+                group.nameEn.contains(q, ignoreCase = true) ||
+                group.variants.any { v ->
+                    v.itemName.contains(q, ignoreCase = true) ||
+                        v.itemNameAr.contains(q, ignoreCase = true) ||
+                        v.barcode.contains(q)
+                }
+            matchesCategory && matchesSearch
+        }
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
 
     private val _budgetLimitDzd = MutableStateFlow(initialPrefs.budgetLimitDzd)
     val budgetLimitDzd: StateFlow<Double> = _budgetLimitDzd.asStateFlow()
@@ -86,6 +148,16 @@ class ShoppingViewModel(
 
     private val _isDarkMode = MutableStateFlow(initialPrefs.isDarkMode)
     val isDarkMode: StateFlow<Boolean> = _isDarkMode.asStateFlow()
+
+    private val _isAutoThemeEnabled = MutableStateFlow(initialPrefs.isAutoThemeEnabled)
+    val isAutoThemeEnabled: StateFlow<Boolean> = _isAutoThemeEnabled.asStateFlow()
+
+    fun setAutoThemeEnabled(enabled: Boolean) {
+        _isAutoThemeEnabled.value = enabled
+        viewModelScope.launch {
+            preferencesStorage.setAutoThemeEnabled(enabled)
+        }
+    }
 
     private val _lastBackupDate = MutableStateFlow(initialPrefs.lastBackupDate)
     val lastBackupDate: StateFlow<String> = _lastBackupDate.asStateFlow()
@@ -113,13 +185,20 @@ class ShoppingViewModel(
     private val _updatedItemsCount = MutableStateFlow(initialPrefs.updatedItemsCount)
     val updatedItemsCount: StateFlow<Int> = _updatedItemsCount.asStateFlow()
 
-    private val _syncIntervalHours = MutableStateFlow(initialPrefs.syncIntervalHours)
+    private val _syncIntervalHours = MutableStateFlow(initialPrefs.syncIntervalHours.coerceIn(1, 168))
     val syncIntervalHours: StateFlow<Int> = _syncIntervalHours.asStateFlow()
 
     fun setSyncIntervalHours(hours: Int) {
-        _syncIntervalHours.value = hours
+        val safeHours = hours.coerceIn(1, 168)
+        _syncIntervalHours.value = safeHours
         viewModelScope.launch {
-            preferencesStorage.setSyncIntervalHours(hours)
+            preferencesStorage.setSyncIntervalHours(safeHours)
+        }
+    }
+
+    fun emitUserMessage(message: String) {
+        viewModelScope.launch {
+            _userMessage.emit(message)
         }
     }
 
@@ -325,6 +404,10 @@ class ShoppingViewModel(
         }
     }
 
+    fun setSelectedPriceCategory(category: String) {
+        _selectedPriceCategory.value = category
+    }
+
     fun autoCategorize(name: String, nameAr: String = ""): String {
         return repository.autoCategorize(name, nameAr)
     }
@@ -351,9 +434,11 @@ class ShoppingViewModel(
     }
 
     fun setBudgetLimit(budget: Double) {
-        _budgetLimitDzd.value = budget
+        if (!budget.isFinite()) return
+        val safeBudget = budget.coerceIn(100.0, 10_000_000.0)
+        _budgetLimitDzd.value = safeBudget
         viewModelScope.launch {
-            preferencesStorage.setBudgetLimitDzd(budget)
+            preferencesStorage.setBudgetLimitDzd(safeBudget)
         }
     }
 
@@ -527,10 +612,31 @@ class ShoppingViewModel(
         storeName: String,
         storeNameAr: String,
         priceDzd: Double,
-        barcode: String? = null
+        barcode: String? = null,
+        category: String = "",
+        isGroup: Boolean = false
     ) {
+        if (name.isBlank() && nameAr.isBlank()) return
+        if (!priceDzd.isFinite() || priceDzd <= 0.0) return
         viewModelScope.launch {
-            repository.addNewProductPrice(name, nameAr, storeName, storeNameAr, priceDzd, barcode)
+            val effectiveBarcode = if (!barcode.isNullOrBlank()) {
+                barcode.trim()
+            } else if (isGroup) {
+                "GRP-${System.currentTimeMillis()}"
+            } else {
+                null
+            }
+            val savedBarcode = repository.addNewProductPrice(
+                name = name,
+                nameAr = nameAr,
+                storeName = storeName,
+                storeNameAr = storeNameAr,
+                priceDzd = priceDzd,
+                barcode = effectiveBarcode
+            )
+            if (category.isNotBlank()) {
+                customBarcodeCategories.value = customBarcodeCategories.value + (savedBarcode to category)
+            }
             _basketSummaries.value = repository.computeBasketComparison(shoppingItems.value)
             val msg = if (_isArabic.value) "تمت إضافة \"$nameAr\" بنجاح بسعر التجزئة ${priceDzd.toInt()} د.ج" else "Added \"$name\" at ${priceDzd.toInt()} DZD"
             _userMessage.emit(msg)
@@ -542,6 +648,7 @@ class ShoppingViewModel(
         storeName: String?,
         newPrice: Double
     ) {
+        if (!newPrice.isFinite() || newPrice <= 0.0) return
         viewModelScope.launch {
             repository.updateProductPrice(barcode, storeName, newPrice)
             _basketSummaries.value = repository.computeBasketComparison(shoppingItems.value)
@@ -557,6 +664,7 @@ class ShoppingViewModel(
         itemName: String,
         priceDzd: Double
     ) {
+        if (!priceDzd.isFinite() || priceDzd <= 0.0) return
         viewModelScope.launch {
             repository.reportCrowdsourcedPrice(barcode, storeName, storeNameAr, itemName, priceDzd)
             _basketSummaries.value = repository.computeBasketComparison(shoppingItems.value)
@@ -567,15 +675,7 @@ class ShoppingViewModel(
 
     fun getPricesForBarcode(barcode: String) = repository.getPricesForBarcode(barcode)
 
-    fun getPriceHistory(barcode: String): StateFlow<List<PriceHistory>> {
-        val flow = MutableStateFlow<List<PriceHistory>>(emptyList())
-        viewModelScope.launch {
-            repository.getPriceHistory(barcode).collect {
-                flow.value = it
-            }
-        }
-        return flow
-    }
+    fun getPriceHistory(barcode: String) = repository.getPricesForBarcode(barcode)
 
     fun getQrSharePayload(): String {
         return repository.createQrShareString(shoppingItems.value)
@@ -636,49 +736,77 @@ class ShoppingViewModel(
 
     fun restoreFromBackupPayload(jsonContent: String) {
         viewModelScope.launch {
+            if (jsonContent.length > MAX_BACKUP_JSON_LENGTH) {
+                val msg = if (_isArabic.value) "ملف النسخة الاحتياطية يتجاوز الحجم الآمن" else "Backup file exceeds maximum safe size"
+                _userMessage.emit(msg)
+                return@launch
+            }
             try {
-                val root = JSONObject(jsonContent)
-                val itemsArray = root.getJSONArray("items")
-                var restoredCount = 0
-                for (i in 0 until itemsArray.length()) {
-                    val obj = itemsArray.getJSONObject(i)
-                    val item = ShoppingItem(
-                        name = obj.getString("name"),
-                        nameAr = obj.optString("nameAr", obj.getString("name")),
-                        category = obj.optString("category", "Pantry"),
-                        quantity = obj.optInt("quantity", 1),
-                        unit = obj.optString("unit", "pcs"),
-                        isChecked = obj.optBoolean("isChecked", false),
-                        barcode = obj.optString("barcode").ifBlank { null },
-                        estimatedPriceDzd = obj.optDouble("estimatedPriceDzd", 0.0)
-                    )
-                    repository.insertItem(item)
-                    restoredCount++
+                val parsed = withContext(Dispatchers.Default) {
+                    val root = JSONObject(jsonContent)
+                    val itemsArray = root.getJSONArray("items")
+                    val limit = itemsArray.length().coerceAtMost(MAX_BACKUP_ITEMS)
+                    val parsedItems = ArrayList<ShoppingItem>(limit)
+                    for (i in 0 until limit) {
+                        val obj = itemsArray.optJSONObject(i) ?: continue
+                        val rawName = obj.optString("name", "").trim().take(120)
+                        if (rawName.isBlank()) continue
+                        val rawNameAr = obj.optString("nameAr", rawName).trim().take(120).ifBlank { rawName }
+                        val rawCategory = obj.optString("category", "Pantry").trim().take(40).ifBlank {
+                            repository.autoCategorize(rawName, rawNameAr)
+                        }
+                        val qty = obj.optInt("quantity", 1).coerceIn(1, 999)
+                        val unit = obj.optString("unit", "pcs").trim().take(24).ifBlank { "pcs" }
+                        val rawPrice = obj.optDouble("estimatedPriceDzd", 0.0)
+                        val safePrice = if (rawPrice.isFinite()) rawPrice.coerceIn(0.0, 10_000_000.0) else 0.0
+                        parsedItems.add(
+                            ShoppingItem(
+                                name = rawName,
+                                nameAr = rawNameAr,
+                                category = rawCategory,
+                                quantity = qty,
+                                unit = unit,
+                                isChecked = obj.optBoolean("isChecked", false),
+                                barcode = obj.optString("barcode").trim().take(64).ifBlank { null },
+                                estimatedPriceDzd = safePrice
+                            )
+                        )
+                    }
+                    Pair(root, parsedItems)
                 }
+
+                val root = parsed.first
+                val restoredItems = parsed.second
+                repository.insertItems(restoredItems)
 
                 if (root.has("budgetLimit")) {
-                    setBudgetLimit(root.getDouble("budgetLimit"))
+                    val b = root.optDouble("budgetLimit", _budgetLimitDzd.value)
+                    if (b.isFinite() && b >= 100.0) setBudgetLimit(b)
                 }
                 if (root.has("isArabic")) {
-                    setLanguage(root.getBoolean("isArabic"))
+                    setLanguage(root.optBoolean("isArabic", _isArabic.value))
                 }
                 if (root.has("isDarkMode")) {
-                    setDarkMode(root.getBoolean("isDarkMode"))
+                    setDarkMode(root.optBoolean("isDarkMode", _isDarkMode.value))
                 }
                 if (root.has("isDynamicGlowEnabled")) {
-                    setDynamicGlowEnabled(root.getBoolean("isDynamicGlowEnabled"))
+                    setDynamicGlowEnabled(root.optBoolean("isDynamicGlowEnabled", _isDynamicGlowEnabled.value))
                 }
                 if (root.has("isLiquidDockSwipeEnabled")) {
-                    setLiquidDockSwipeEnabled(root.getBoolean("isLiquidDockSwipeEnabled"))
+                    setLiquidDockSwipeEnabled(root.optBoolean("isLiquidDockSwipeEnabled", _isLiquidDockSwipeEnabled.value))
                 }
                 if (root.has("syncIntervalHours")) {
-                    setSyncIntervalHours(root.getInt("syncIntervalHours"))
+                    val h = root.optInt("syncIntervalHours", _syncIntervalHours.value)
+                    if (h in listOf(6, 12, 24)) setSyncIntervalHours(h)
                 }
 
-                val msg = if (_isArabic.value) "تمت استعادة $restoredCount عنصر من Google Drive بنجاح!" else "Successfully restored $restoredCount items from Google Drive!"
+                val msg = if (_isArabic.value) {
+                    "تمت استعادة ${restoredItems.size} عنصر من Google Drive بنجاح!"
+                } else {
+                    "Successfully restored ${restoredItems.size} items from Google Drive!"
+                }
                 _userMessage.emit(msg)
-            } catch (e: Exception) {
-                e.printStackTrace()
+            } catch (_: Exception) {
                 val msg = if (_isArabic.value) "خطأ في ملف النسخة الاحتياطية" else "Invalid backup file format"
                 _userMessage.emit(msg)
             }
@@ -701,10 +829,10 @@ class ShoppingViewModel(
             }
 
             // If some items are checked, use checked items, otherwise all items
-            val targetItems = if (currentItems.any { it.isChecked }) currentItems.filter { it.isChecked } else currentItems
-            val total = customTotal ?: targetItems.sumOf { 
-                (if (it.estimatedPriceDzd > 0) it.estimatedPriceDzd else 120.0) * it.quantity 
-            }
+            val hasChecked = currentItems.any { it.isChecked }
+            val targetItems = if (hasChecked) currentItems.filter { it.isChecked } else currentItems
+            val total = customTotal?.takeIf { it.isFinite() && it >= 0.0 }
+                ?: targetItems.sumOf { it.estimatedPriceDzd.coerceAtLeast(0.0) * it.quantity }
             val count = targetItems.sumOf { it.quantity }
 
             val now = System.currentTimeMillis()
@@ -714,7 +842,7 @@ class ShoppingViewModel(
             val dateStr = dateFormatter.format(Date(now))
 
             val summaryText = targetItems.take(4).joinToString("، ") { if (_isArabic.value) it.nameAr else it.name }
-            val topCategory = targetItems.groupBy { it.category }.maxByOrNull { it.value.size }?.key ?: "Grocery"
+            val topCategory = targetItems.groupBy { it.category }.maxByOrNull { it.value.size }?.key ?: "Pantry"
 
             val record = SpendingRecord(
                 timestamp = now,
@@ -730,13 +858,11 @@ class ShoppingViewModel(
 
             repository.recordShoppingTrip(record)
 
-            // Clear the purchased items from list
-            if (currentItems.any { it.isChecked }) {
+            // Clear the purchased items from list in a single query
+            if (hasChecked) {
                 repository.clearCheckedItems()
             } else {
-                for (item in currentItems) {
-                    repository.deleteItem(item)
-                }
+                repository.clearAllItems()
             }
 
             val formatted = LocalizationUtil.formatDzd(total, _isArabic.value)

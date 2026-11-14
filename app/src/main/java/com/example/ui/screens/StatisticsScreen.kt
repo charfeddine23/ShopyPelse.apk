@@ -87,9 +87,7 @@ import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.viewmodel.ShoppingViewModel
 import com.example.util.LocalizationUtil
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -389,18 +387,30 @@ fun StatisticsScreen(
 
                         Spacer(modifier = Modifier.height(14.dp))
 
-                        // 4 Weekly bars
-                        val maxWeekVal = (totalSpent / 2.0).coerceAtLeast(1000.0)
-                        val w1 = (totalSpent * 0.28).toInt().toDouble()
-                        val w2 = (totalSpent * 0.35).toInt().toDouble()
-                        val w3 = (totalSpent * 0.22).toInt().toDouble()
-                        val w4 = (totalSpent - w1 - w2 - w3).coerceAtLeast(0.0)
+                        // 4 Weekly bars computed from actual record timestamps
+                        val weeklyTotals = remember(filteredRecords) {
+                            val buckets = doubleArrayOf(0.0, 0.0, 0.0, 0.0)
+                            val cal = Calendar.getInstance()
+                            filteredRecords.forEach { rec ->
+                                cal.timeInMillis = rec.timestamp
+                                val day = cal.get(Calendar.DAY_OF_MONTH)
+                                val idx = when {
+                                    day <= 7 -> 0
+                                    day <= 14 -> 1
+                                    day <= 21 -> 2
+                                    else -> 3
+                                }
+                                buckets[idx] += rec.totalSpentDzd.coerceAtLeast(0.0)
+                            }
+                            buckets
+                        }
+                        val maxWeekVal = (weeklyTotals.maxOrNull() ?: 0.0).coerceAtLeast(1000.0)
 
                         val weeks = listOf(
-                            Pair(if (isArabic) "الأسبوع 1" else "Week 1", w1),
-                            Pair(if (isArabic) "الأسبوع 2" else "Week 2", w2),
-                            Pair(if (isArabic) "الأسبوع 3" else "Week 3", w3),
-                            Pair(if (isArabic) "الأسبوع 4" else "Week 4", w4)
+                            Pair(if (isArabic) "الأسبوع 1" else "Week 1", weeklyTotals[0]),
+                            Pair(if (isArabic) "الأسبوع 2" else "Week 2", weeklyTotals[1]),
+                            Pair(if (isArabic) "الأسبوع 3" else "Week 3", weeklyTotals[2]),
+                            Pair(if (isArabic) "الأسبوع 4" else "Week 4", weeklyTotals[3])
                         )
 
                         Row(
@@ -412,7 +422,7 @@ fun StatisticsScreen(
                             verticalAlignment = Alignment.Bottom
                         ) {
                             weeks.forEach { (weekLabel, amount) ->
-                                val fraction = (amount / maxWeekVal).toFloat().coerceIn(0.12f, 1f)
+                                val fraction = if (amount <= 0.0) 0.06f else (amount / maxWeekVal).toFloat().coerceIn(0.12f, 1f)
                                 val animatedHeight by animateFloatAsState(
                                     targetValue = fraction,
                                     animationSpec = tween(durationMillis = 600),
@@ -517,8 +527,12 @@ fun StatisticsScreen(
                                             .clip(RoundedCornerShape(3.dp)),
                                         color = when (category) {
                                             "Dairy" -> ElectricCyan
-                                            "Meat" -> Color(0xFFEF4444)
+                                            "Butchery", "Meat" -> Color(0xFFEF4444)
                                             "Produce" -> EmeraldSavings
+                                            "Beverages", "HerbalDrinks" -> Color(0xFF38BDF8)
+                                            "Bakery" -> Color(0xFFF59E0B)
+                                            "Household" -> Color(0xFFA855F7)
+                                            "SweetsNuts" -> Color(0xFFEC4899)
                                             else -> NeonAmber
                                         },
                                         trackColor = if (isLight) Color(0xFFE2E8F0) else Color(0x20FFFFFF)
@@ -802,6 +816,11 @@ private fun ManualExpenseDialog(
     var notes by remember { mutableStateOf("") }
     val isLight = MaterialTheme.colorScheme.background == BackgroundLight
 
+    val parsedAmount = amountText.replace(",", ".").toDoubleOrNull()
+    val parsedCount = countText.toIntOrNull()?.coerceIn(1, 999) ?: 1
+    val activeStore = if (isArabic) storeNameAr else storeName
+    val canSave = parsedAmount != null && parsedAmount > 0.0 && parsedAmount.isFinite() && activeStore.isNotBlank()
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = if (isLight) Color.White else Color(0xFF131D2E),
@@ -825,10 +844,19 @@ private fun ManualExpenseDialog(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 OutlinedTextField(
-                    value = if (isArabic) storeNameAr else storeName,
-                    onValueChange = {
-                        storeName = it
-                        storeNameAr = it
+                    value = activeStore,
+                    onValueChange = { value ->
+                        if (isArabic) {
+                            storeNameAr = value
+                            if (storeName == "Uno Hypermarket" || storeName.isBlank()) {
+                                storeName = value
+                            }
+                        } else {
+                            storeName = value
+                            if (storeNameAr == "هايبرماركت أونو" || storeNameAr.isBlank()) {
+                                storeNameAr = value
+                            }
+                        }
                     },
                     label = { Text(if (isArabic) "اسم المتجر / السوبرماركت" else "Store Name") },
                     singleLine = true,
@@ -860,12 +888,12 @@ private fun ManualExpenseDialog(
             GlowingActionButton(
                 text = if (isArabic) "حفظ في الإحصائيات" else "Save Expense",
                 color = EmeraldSavings,
+                enabled = canSave,
                 onClick = {
-                    val amount = amountText.toDoubleOrNull() ?: 0.0
-                    val count = countText.toIntOrNull() ?: 1
-                    if (amount > 0) {
-                        onConfirm(storeName, storeNameAr, amount, count, "Grocery", notes)
-                    }
+                    val safeAmount = parsedAmount ?: return@GlowingActionButton
+                    val safeStoreEn = storeName.ifBlank { storeNameAr }.trim()
+                    val safeStoreAr = storeNameAr.ifBlank { storeName }.trim()
+                    onConfirm(safeStoreEn, safeStoreAr, safeAmount, parsedCount, "Pantry", notes.trim())
                 }
             )
         },

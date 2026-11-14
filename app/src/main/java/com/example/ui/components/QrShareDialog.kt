@@ -70,8 +70,10 @@ import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.util.QrCodeUtil
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun QrShareDialog(
@@ -91,8 +93,12 @@ fun QrShareDialog(
     val isLight = MaterialTheme.colorScheme.background == BackgroundLight
 
     LaunchedEffect(payload) {
-        if (payload.isNotBlank()) {
-            qrBitmap = QrCodeUtil.generateQrBitmap(payload, 450)
+        qrBitmap = if (payload.isNotBlank()) {
+            withContext(Dispatchers.Default) {
+                QrCodeUtil.generateQrBitmap(payload, 450)
+            }
+        } else {
+            null
         }
     }
 

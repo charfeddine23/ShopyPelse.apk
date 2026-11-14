@@ -12,6 +12,9 @@ interface SpendingDao {
     @Query("SELECT * FROM spending_records ORDER BY timestamp DESC")
     fun getAllSpendingRecords(): Flow<List<SpendingRecord>>
 
+    @Query("SELECT COUNT(*) FROM spending_records")
+    suspend fun getSpendingRecordCount(): Int
+
     @Query("SELECT * FROM spending_records WHERE monthKey = :monthKey ORDER BY timestamp DESC")
     fun getSpendingForMonth(monthKey: String): Flow<List<SpendingRecord>>
 

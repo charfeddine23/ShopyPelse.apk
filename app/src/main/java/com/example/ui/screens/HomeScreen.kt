@@ -97,6 +97,7 @@ import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.NeonBadge
 import com.example.ui.components.SwipeToDeleteContainer
 import com.example.ui.components.WindGlowAppNameBanner
+import com.example.ui.components.disableParentPagerSwipe
 import com.example.ui.components.horizontalFadingEdge
 import com.example.ui.theme.BackgroundLight
 import com.example.ui.theme.CheckedGreen
@@ -122,7 +123,6 @@ import com.example.ui.theme.TextSecondaryLight
 import com.example.ui.viewmodel.ShoppingViewModel
 import com.example.util.LocalizationUtil
 import com.example.util.ProductGroup
-import com.example.util.ProductGroupingUtil
 import com.example.util.ProductVariant
 import kotlinx.coroutines.launch
 
@@ -316,7 +316,7 @@ fun HomeScreen(
     // Add Item Modal Bottom Sheet
     if (showAddDialog) {
         val isLight = MaterialTheme.colorScheme.background == BackgroundLight
-        val marketPrices by viewModel.marketPrices.collectAsStateWithLifecycle()
+        val productGroups by viewModel.productGroups.collectAsStateWithLifecycle()
         ModalBottomSheet(
             onDismissRequest = { showAddDialog = false },
             sheetState = sheetState,
@@ -334,7 +334,7 @@ fun HomeScreen(
         ) {
             AddItemSheetContent(
                 isArabic = isArabic,
-                availableProducts = marketPrices,
+                productGroups = productGroups,
                 onDismiss = {
                     scope.launch { sheetState.hide() }.invokeOnCompletion { showAddDialog = false }
                 },
@@ -345,9 +345,10 @@ fun HomeScreen(
                 }
             )
         }
+    }
 
-        // Finish Shopping Trip & Transfer to Analytics Dialog
-        if (showFinishTripDialog) {
+    // Finish Shopping Trip & Transfer to Analytics Dialog
+    if (showFinishTripDialog) {
             val stores = listOf(
                 Pair("Uno Hypermarket", "هايبرماركت أونو"),
                 Pair("Ardis Alger", "أرديس الجزائر"),
@@ -432,7 +433,6 @@ fun HomeScreen(
                     }
                 }
             )
-        }
     }
 }
 
@@ -594,7 +594,11 @@ private fun FrequentItemsSection(
     val presetCardBorder = if (isLight) BorderStroke(1.dp, LightCardBorder) else BorderStroke(1.dp, Color(0x33FFFFFF))
     val presetPriceColor = if (isLight) MintTintText else EmeraldSavings
 
-    Column(modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)) {
+    Column(
+        modifier = Modifier
+            .disableParentPagerSwipe()
+            .padding(top = 10.dp, bottom = 6.dp)
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -688,6 +692,7 @@ private fun CategoryChipsSection(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .disableParentPagerSwipe()
             .horizontalFadingEdge(fadeWidth = 26.dp)
             .horizontalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -991,7 +996,7 @@ private fun EmptyListCard(
 @Composable
 fun AddItemSheetContent(
     isArabic: Boolean,
-    availableProducts: List<com.example.data.model.MarketPrice> = emptyList(),
+    productGroups: List<ProductGroup> = emptyList(),
     onDismiss: () -> Unit,
     onAutoCategorize: (name: String, nameAr: String) -> String,
     onAddItem: (name: String, nameAr: String, category: String, qty: Int, unit: String, barcode: String?, price: Double) -> Unit
@@ -1007,24 +1012,19 @@ fun AddItemSheetContent(
     var manualUnit by remember { mutableStateOf("pcs") }
     var manualPrice by remember { mutableDoubleStateOf(0.0) }
 
-    // Auto-group all catalog products using ProductGroupingUtil
-    val allGroups = remember(availableProducts) {
-        ProductGroupingUtil.groupMarketPrices(availableProducts)
-    }
-
-    // Filter groups only: in search mode, display groups only
-    val filteredGroups = remember(allGroups, productSearchQuery) {
+    // Filter pre-grouped catalog products off the heavy grouping step
+    val filteredGroups = remember(productGroups, productSearchQuery) {
         if (productSearchQuery.isBlank()) {
-            allGroups
+            productGroups
         } else {
-            val q = productSearchQuery.trim().lowercase()
-            allGroups.filter { group ->
-                group.nameAr.lowercase().contains(q) ||
-                group.nameEn.lowercase().contains(q) ||
-                group.category.lowercase().contains(q) ||
+            val q = productSearchQuery.trim()
+            productGroups.filter { group ->
+                group.nameAr.contains(q, ignoreCase = true) ||
+                group.nameEn.contains(q, ignoreCase = true) ||
+                group.category.contains(q, ignoreCase = true) ||
                 group.variants.any { v ->
-                    v.itemName.lowercase().contains(q) ||
-                    v.itemNameAr.lowercase().contains(q) ||
+                    v.itemName.contains(q, ignoreCase = true) ||
+                    v.itemNameAr.contains(q, ignoreCase = true) ||
                     v.barcode.contains(q)
                 }
             }
@@ -1658,7 +1658,12 @@ private fun AddItemGroupCard(
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
 
-                    group.variants.forEach { variant ->
+                    var visibleLimit by remember(group.id, isExpanded) { mutableIntStateOf(20) }
+                    val visibleVariants = remember(group.variants, visibleLimit) {
+                        group.variants.take(visibleLimit)
+                    }
+
+                    visibleVariants.forEach { variant ->
                         val isVarAdded = (justAddedId == variant.barcode)
                         Row(
                             modifier = Modifier
@@ -1724,6 +1729,30 @@ private fun AddItemGroupCard(
                                     )
                                 }
                             }
+                        }
+                    }
+
+                    if (group.variants.size > visibleLimit) {
+                        val remaining = group.variants.size - visibleLimit
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isLight) CyanTintBg else ElectricCyan.copy(alpha = 0.14f))
+                                .border(
+                                    BorderStroke(1.dp, if (isLight) CyanTintBorder else ElectricCyan.copy(alpha = 0.35f)),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .clickable { visibleLimit += 25 }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (isArabic) "عرض المزيد ($remaining متبقي)" else "Show more ($remaining remaining)",
+                                color = if (isLight) CyanTintText else ElectricCyan,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }

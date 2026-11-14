@@ -5,15 +5,11 @@
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="root" path="cache/"/>
+        <exclude domain="database" path="shopypulse_database.db-wal"/>
+        <exclude domain="database" path="shopypulse_database.db-shm"/>
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="root" path="cache/"/>
     </device-transfer>
-    -->
 </data-extraction-rules>

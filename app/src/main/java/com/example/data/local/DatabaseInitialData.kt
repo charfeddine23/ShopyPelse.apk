@@ -200,7 +200,7 @@ object DatabaseInitialData {
             storeName = "Ardis Alger",
             storeNameAr = "أرديس الجزائر",
             itemsSummary = "دجاج بلدي طازج، مسحوق غسيل إيزيس، عصير رامي",
-            topCategory = "Meat"
+            topCategory = "Butchery"
         ),
         com.example.data.model.SpendingRecord(
             timestamp = System.currentTimeMillis() - 12 * 86400000L,

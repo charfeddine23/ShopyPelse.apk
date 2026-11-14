@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -119,6 +120,8 @@ fun WindGlowAppNameBanner(
             .testTag("wind_glow_app_banner")
     ) {
         if (isGlowEnabled) {
+            val path1 = remember { Path() }
+            val path2 = remember { Path() }
             // LAYER 1: STRICTLY BEHIND - Ambient glowing wind effect with soft edge fade (NO solid border)
             Canvas(
                 modifier = Modifier
@@ -162,7 +165,7 @@ fun WindGlowAppNameBanner(
             val basePhase = windProgress * 2.0 * PI * dir
 
             // 2. Wind Stream Ribbon 1 (Top Cyan Flow with 4-way soft alpha fade)
-            val path1 = Path()
+            path1.reset()
             val steps = 30
             val dx = w / steps
             for (i in 0..steps) {
@@ -186,7 +189,7 @@ fun WindGlowAppNameBanner(
             )
 
             // 3. Wind Stream Ribbon 2 (Main Lower Stream with soft alpha fade)
-            val path2 = Path()
+            path2.reset()
             for (i in 0..steps) {
                 val x = i * dx
                 val normX = (x / w).toDouble()

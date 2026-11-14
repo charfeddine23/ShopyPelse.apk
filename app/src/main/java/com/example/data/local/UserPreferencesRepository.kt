@@ -24,6 +24,7 @@ private val Context.shopyPulseDataStore: DataStore<Preferences> by preferencesDa
 data class AppPreferencesState(
     val isArabic: Boolean = true,
     val isDarkMode: Boolean = true,
+    val isAutoThemeEnabled: Boolean = false,
     val isDynamicGlowEnabled: Boolean = true,
     val isLiquidDockSwipeEnabled: Boolean = true,
     val isFullScreenEnabled: Boolean = false,
@@ -47,6 +48,7 @@ interface AppPreferencesStorage {
     fun getInitialState(): AppPreferencesState
     suspend fun setArabic(isArabic: Boolean)
     suspend fun setDarkMode(isDarkMode: Boolean)
+    suspend fun setAutoThemeEnabled(enabled: Boolean)
     suspend fun setDynamicGlowEnabled(enabled: Boolean)
     suspend fun setLiquidDockSwipeEnabled(enabled: Boolean)
     suspend fun setFullScreenEnabled(enabled: Boolean)
@@ -81,6 +83,7 @@ class UserPreferencesRepository(context: Context) : AppPreferencesStorage {
     private object Keys {
         val IS_ARABIC = booleanPreferencesKey("is_arabic")
         val IS_DARK_MODE = booleanPreferencesKey("is_dark_mode")
+        val IS_AUTO_THEME = booleanPreferencesKey("is_auto_theme_enabled")
         val IS_DYNAMIC_GLOW = booleanPreferencesKey("is_dynamic_glow_enabled")
         val IS_LIQUID_DOCK_SWIPE = booleanPreferencesKey("is_liquid_dock_swipe_enabled")
         val IS_FULL_SCREEN = booleanPreferencesKey("is_full_screen_enabled")
@@ -99,11 +102,14 @@ class UserPreferencesRepository(context: Context) : AppPreferencesStorage {
         val LATEST_KNOWN_VERSION = stringPreferencesKey("latest_known_version")
     }
 
+    private val cachedFallback: AppPreferencesState by lazy { getInitialState() }
+
     override val preferencesFlow: Flow<AppPreferencesState> = dataStore.data.map { prefs ->
-        val fallback = getInitialState()
+        val fallback = cachedFallback
         AppPreferencesState(
             isArabic = prefs[Keys.IS_ARABIC] ?: fallback.isArabic,
             isDarkMode = prefs[Keys.IS_DARK_MODE] ?: fallback.isDarkMode,
+            isAutoThemeEnabled = prefs[Keys.IS_AUTO_THEME] ?: fallback.isAutoThemeEnabled,
             isDynamicGlowEnabled = prefs[Keys.IS_DYNAMIC_GLOW] ?: fallback.isDynamicGlowEnabled,
             isLiquidDockSwipeEnabled = prefs[Keys.IS_LIQUID_DOCK_SWIPE] ?: fallback.isLiquidDockSwipeEnabled,
             isFullScreenEnabled = prefs[Keys.IS_FULL_SCREEN] ?: fallback.isFullScreenEnabled,
@@ -137,6 +143,7 @@ class UserPreferencesRepository(context: Context) : AppPreferencesStorage {
                 defaultArabic
             },
             isDarkMode = cachePrefs.getBoolean("is_dark_mode", true),
+            isAutoThemeEnabled = cachePrefs.getBoolean("is_auto_theme_enabled", false),
             isDynamicGlowEnabled = cachePrefs.getBoolean("is_dynamic_glow_enabled", true),
             isLiquidDockSwipeEnabled = cachePrefs.getBoolean("is_liquid_dock_swipe_enabled", true),
             isFullScreenEnabled = cachePrefs.getBoolean("is_full_screen_enabled", false),
@@ -171,6 +178,11 @@ class UserPreferencesRepository(context: Context) : AppPreferencesStorage {
     override suspend fun setDarkMode(isDarkMode: Boolean) {
         cachePrefs.edit().putBoolean("is_dark_mode", isDarkMode).apply()
         dataStore.edit { it[Keys.IS_DARK_MODE] = isDarkMode }
+    }
+
+    override suspend fun setAutoThemeEnabled(enabled: Boolean) {
+        cachePrefs.edit().putBoolean("is_auto_theme_enabled", enabled).apply()
+        dataStore.edit { it[Keys.IS_AUTO_THEME] = enabled }
     }
 
     override suspend fun setDynamicGlowEnabled(enabled: Boolean) {
@@ -271,6 +283,7 @@ class InMemoryPreferencesStorage(
     override fun getInitialState(): AppPreferencesState = state.value
     override suspend fun setArabic(isArabic: Boolean) { state.value = state.value.copy(isArabic = isArabic) }
     override suspend fun setDarkMode(isDarkMode: Boolean) { state.value = state.value.copy(isDarkMode = isDarkMode) }
+    override suspend fun setAutoThemeEnabled(enabled: Boolean) { state.value = state.value.copy(isAutoThemeEnabled = enabled) }
     override suspend fun setDynamicGlowEnabled(enabled: Boolean) { state.value = state.value.copy(isDynamicGlowEnabled = enabled) }
     override suspend fun setLiquidDockSwipeEnabled(enabled: Boolean) { state.value = state.value.copy(isLiquidDockSwipeEnabled = enabled) }
     override suspend fun setFullScreenEnabled(enabled: Boolean) { state.value = state.value.copy(isFullScreenEnabled = enabled) }

@@ -75,6 +75,8 @@ object AppUpdateChecker {
         "https://api.github.com/repos/$it/releases/latest"
     }
 
+    private const val MAX_APK_SIZE_BYTES = 200L * 1024L * 1024L
+
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
@@ -82,6 +84,25 @@ object AppUpdateChecker {
             .followRedirects(true)
             .followSslRedirects(true)
             .build()
+    }
+
+    /**
+     * Validates that update/download URLs strictly use HTTPS and belong to GitHub-owned hosts.
+     * Prevents HTTP downgrade, arbitrary third-party redirects, or non-HTTPS scheme injection.
+     */
+    fun isTrustedUpdateUrl(url: String): Boolean {
+        val trimmed = url.trim()
+        if (!trimmed.startsWith("https://", ignoreCase = true)) return false
+        val host = try {
+            java.net.URI(trimmed).host?.lowercase() ?: return false
+        } catch (_: Exception) {
+            return false
+        }
+        return host == "github.com" ||
+            host == "api.github.com" ||
+            host.endsWith(".github.com") ||
+            host == "githubusercontent.com" ||
+            host.endsWith(".githubusercontent.com")
     }
 
     suspend fun checkForUpdate(currentVersionName: String): AppUpdateStatus = withContext(Dispatchers.IO) {
@@ -188,7 +209,8 @@ object AppUpdateChecker {
                 .build()
 
             client.newCall(headReq).execute().use { response ->
-                val resolvedUrl = response.request.url.toString().ifBlank { UPDATE_URL }
+                val rawResolved = response.request.url.toString()
+                val resolvedUrl = if (isTrustedUpdateUrl(rawResolved)) rawResolved else UPDATE_URL
                 return@withContext AppUpdateStatus.ReadyDirectLink(
                     currentVersion = currentVersionName,
                     downloadUrl = resolvedUrl
@@ -209,7 +231,7 @@ object AppUpdateChecker {
             val asset = assets.optJSONObject(i) ?: continue
             val assetName = asset.optString("name", "")
             val browserUrl = asset.optString("browser_download_url", "")
-            if (assetName.endsWith(".apk", ignoreCase = true) && browserUrl.isNotBlank()) {
+            if (assetName.endsWith(".apk", ignoreCase = true) && isTrustedUpdateUrl(browserUrl)) {
                 return browserUrl
             }
         }
@@ -262,7 +284,7 @@ object AppUpdateChecker {
                                 val item = arr.optJSONObject(i) ?: continue
                                 val name = item.optString("name", "")
                                 val rawUrl = item.optString("download_url", "")
-                                if (name.endsWith(".apk", ignoreCase = true) && rawUrl.isNotBlank()) {
+                                if (name.endsWith(".apk", ignoreCase = true) && isTrustedUpdateUrl(rawUrl)) {
                                     return rawUrl
                                 }
                             }
@@ -294,6 +316,17 @@ object AppUpdateChecker {
         val targetFile = File(updatesDir, "Shopy.Pulse.$safeVersion.apk")
 
         try {
+            if (!targetFile.canonicalPath.startsWith(updatesDir.canonicalPath + File.separator)) {
+                emit(
+                    ApkDownloadState.Failed(
+                        messageAr = "مسار حفظ ملف التحديث غير صالح.",
+                        messageEn = "Invalid update destination path.",
+                        fallbackUrl = UPDATE_URL
+                    )
+                )
+                return@flow
+            }
+
             // If URL is the repository homepage or not yet a direct binary link, resolve the real APK asset inside the app
             val effectiveUrl = if (
                 downloadUrl.equals(UPDATE_URL, ignoreCase = true) ||
@@ -304,6 +337,17 @@ object AppUpdateChecker {
                 downloadUrl
             }
 
+            if (!isTrustedUpdateUrl(effectiveUrl)) {
+                emit(
+                    ApkDownloadState.Failed(
+                        messageAr = "رابط التحديث غير موثوق أو لا يستخدم HTTPS.",
+                        messageEn = "Untrusted or non-HTTPS update URL rejected.",
+                        fallbackUrl = UPDATE_URL
+                    )
+                )
+                return@flow
+            }
+
             val request = Request.Builder()
                 .url(effectiveUrl)
                 .header("User-Agent", "ShopyPulse-Android")
@@ -311,6 +355,18 @@ object AppUpdateChecker {
                 .build()
 
             client.newCall(request).execute().use { response ->
+                val finalUrl = response.request.url.toString()
+                if (!isTrustedUpdateUrl(finalUrl)) {
+                    emit(
+                        ApkDownloadState.Failed(
+                            messageAr = "تم حظر إعادة توجيه التحديث إلى مصدر غير موثوق.",
+                            messageEn = "Blocked redirect to untrusted update host.",
+                            fallbackUrl = UPDATE_URL
+                        )
+                    )
+                    return@flow
+                }
+
                 if (!response.isSuccessful) {
                     emit(
                         ApkDownloadState.Failed(
@@ -347,6 +403,17 @@ object AppUpdateChecker {
                 }
 
                 val totalBytes = body.contentLength()
+                if (totalBytes > MAX_APK_SIZE_BYTES) {
+                    emit(
+                        ApkDownloadState.Failed(
+                            messageAr = "حجم ملف التحديث يتجاوز الحد الآمن المسموح.",
+                            messageEn = "Update file exceeds safe maximum size.",
+                            fallbackUrl = effectiveUrl
+                        )
+                    )
+                    return@flow
+                }
+
                 var downloadedBytes = 0L
                 var lastEmittedPercent = -1
                 var lastEmittedBytes = 0L
@@ -358,6 +425,19 @@ object AppUpdateChecker {
                         while (true) {
                             val read = input.read(buffer)
                             if (read == -1) break
+
+                            if (downloadedBytes + read > MAX_APK_SIZE_BYTES) {
+                                output.close()
+                                targetFile.delete()
+                                emit(
+                                    ApkDownloadState.Failed(
+                                        messageAr = "تجاوز التحميل الحد الأقصى المسموح به.",
+                                        messageEn = "Download exceeded maximum allowed APK size.",
+                                        fallbackUrl = effectiveUrl
+                                    )
+                                )
+                                return@flow
+                            }
 
                             // Validate APK/ZIP magic bytes ('P', 'K') on first chunk
                             if (!checkedMagic && read >= 2) {
@@ -406,6 +486,20 @@ object AppUpdateChecker {
                     }
                 }
 
+                // Validate archive packageName matches current applicationId before offering install
+                val archiveInfo = context.packageManager.getPackageArchiveInfo(targetFile.absolutePath, 0)
+                if (archiveInfo == null || archiveInfo.packageName != context.packageName) {
+                    targetFile.delete()
+                    emit(
+                        ApkDownloadState.Failed(
+                            messageAr = "حزمة التحديث لا تطابق هوية التطبيق وتم رفضها أمنياً.",
+                            messageEn = "Downloaded APK does not match app package ID.",
+                            fallbackUrl = effectiveUrl
+                        )
+                    )
+                    return@flow
+                }
+
                 emit(
                     ApkDownloadState.Downloading(
                         progressPercent = 100,
@@ -421,7 +515,7 @@ object AppUpdateChecker {
                 ApkDownloadState.Failed(
                     messageAr = "تعذر إكمال التحميل: ${e.localizedMessage ?: "خطأ في الشبكة"}",
                     messageEn = "Download failed: ${e.localizedMessage ?: "Network error"}",
-                    fallbackUrl = downloadUrl
+                    fallbackUrl = if (isTrustedUpdateUrl(downloadUrl)) downloadUrl else UPDATE_URL
                 )
             )
         }
@@ -432,6 +526,21 @@ object AppUpdateChecker {
      * Returns true if installer intent was launched, false if user needs to grant install permission first.
      */
     fun triggerApkInstall(context: Context, apkFile: File): Boolean {
+        val updatesDir = File(context.cacheDir, "updates")
+        val isInsideUpdatesDir = try {
+            apkFile.exists() &&
+                apkFile.isFile &&
+                apkFile.canonicalPath.startsWith(updatesDir.canonicalPath + File.separator)
+        } catch (_: Exception) {
+            false
+        }
+        if (!isInsideUpdatesDir) return false
+
+        val archiveInfo = context.packageManager.getPackageArchiveInfo(apkFile.absolutePath, 0)
+        if (archiveInfo == null || archiveInfo.packageName != context.packageName) {
+            return false
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
             val permIntent = Intent(
                 Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
@@ -439,22 +548,28 @@ object AppUpdateChecker {
             ).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            context.startActivity(permIntent)
+            try {
+                context.startActivity(permIntent)
+            } catch (_: Exception) {}
             return false
         }
 
-        val apkUri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            apkFile
-        )
-        val installIntent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(apkUri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        return try {
+            val apkUri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                apkFile
+            )
+            val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(apkUri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(installIntent)
+            true
+        } catch (_: Exception) {
+            false
         }
-        context.startActivity(installIntent)
-        return true
     }
 
     /**

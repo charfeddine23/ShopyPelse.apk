@@ -72,6 +72,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -103,6 +104,7 @@ import com.example.data.model.StoreBasketSummary
 import com.example.ui.components.GlowingActionButton
 import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.NeonBadge
+import com.example.ui.components.disableParentPagerSwipe
 import com.example.ui.components.horizontalFadingEdge
 import com.example.ui.theme.BackgroundLight
 import com.example.ui.theme.CyanTintBg
@@ -131,7 +133,6 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import com.example.util.ProductGroup
 import com.example.util.ProductVariant
-import com.example.util.ProductGroupingUtil
 import com.example.util.LocalizationUtil
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -148,35 +149,17 @@ fun PriceComparisonScreen(
     modifier: Modifier = Modifier
 ) {
     val isArabic by viewModel.isArabic.collectAsStateWithLifecycle()
-    val allPrices by viewModel.marketPrices.collectAsStateWithLifecycle()
-    val basketSummaries by viewModel.basketSummaries.collectAsStateWithLifecycle()
-    val shoppingItems by viewModel.shoppingItems.collectAsStateWithLifecycle()
+    val productGroups by viewModel.filteredProductGroups.collectAsStateWithLifecycle()
+    val allProductGroups by viewModel.productGroups.collectAsStateWithLifecycle()
     val syncIntervalHours by viewModel.syncIntervalHours.collectAsStateWithLifecycle()
     val lastSyncTime by viewModel.lastPriceSyncTimestamp.collectAsStateWithLifecycle()
     val isSyncingPrices by viewModel.isSyncingPrices.collectAsStateWithLifecycle()
     val updatedCount by viewModel.updatedItemsCount.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
-    val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
+    val selectedCategory by viewModel.selectedPriceCategory.collectAsStateWithLifecycle()
 
     var reportItemDialog by remember { mutableStateOf<MarketPrice?>(null) }
     var showAddProductOrGroupDialog by remember { mutableStateOf(false) }
-
-    val productGroups = remember(allPrices, searchQuery, selectedCategory) {
-        val groups = ProductGroupingUtil.groupMarketPrices(allPrices)
-        groups.filter { group ->
-            val matchesCategory = if (selectedCategory == "All") true else group.category == selectedCategory
-            val matchesSearch = if (searchQuery.isBlank()) true else {
-                group.nameAr.contains(searchQuery, ignoreCase = true) ||
-                group.nameEn.contains(searchQuery, ignoreCase = true) ||
-                group.variants.any { v ->
-                    v.itemName.contains(searchQuery, ignoreCase = true) ||
-                    v.itemNameAr.contains(searchQuery, ignoreCase = true) ||
-                    v.barcode.contains(searchQuery)
-                }
-            }
-            matchesCategory && matchesSearch
-        }
-    }
 
     val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
@@ -462,6 +445,7 @@ fun PriceComparisonScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .disableParentPagerSwipe()
                         .padding(horizontal = 16.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -502,7 +486,7 @@ fun PriceComparisonScreen(
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(chipBg)
                                     .border(chipBorder, RoundedCornerShape(12.dp))
-                                    .clickable { viewModel.setSelectedCategory(cat) }
+                                    .clickable { viewModel.setSelectedPriceCategory(cat) }
                                     .padding(horizontal = 14.dp, vertical = 7.dp)
                             ) {
                                 Text(
@@ -552,6 +536,7 @@ fun PriceComparisonScreen(
                     group = group,
                     isArabic = isArabic,
                     autoExpand = searchQuery.isNotBlank(),
+                    searchQuery = searchQuery,
                     onAddGroupToCart = { grp ->
                         viewModel.addItem(
                             name = grp.nameEn,
@@ -621,7 +606,9 @@ fun PriceComparisonScreen(
                     storeName = storeName,
                     storeNameAr = storeNameAr,
                     priceDzd = priceDzd,
-                    barcode = barcode
+                    barcode = barcode,
+                    category = category,
+                    isGroup = isGroup
                 )
                 showAddProductOrGroupDialog = false
             }
@@ -633,7 +620,7 @@ fun PriceComparisonScreen(
             lastSyncTime = lastSyncTime,
             syncIntervalHours = syncIntervalHours,
             updatedCount = updatedCount,
-            totalProductsCount = allPrices.map { it.barcode }.distinct().size,
+            totalProductsCount = allProductGroups.sumOf { it.variants.size },
             isSyncing = isSyncingPrices,
             isArabic = isArabic,
             onDismiss = { showUpdateSettingsDialog = false },
@@ -686,6 +673,7 @@ fun DynamicPullGlowingBackground(
     }
 
     val baseAlpha = if (isSyncing) 0.45f else ((pullRatio * 0.6f + holdProgress * 0.4f) * pulseShimmer).coerceIn(0f, 0.95f)
+    val wavePath = remember { Path() }
 
     Box(
         modifier = modifier
@@ -729,7 +717,8 @@ fun DynamicPullGlowingBackground(
 
             // 3. Fluid neon wave light rays cascading down the top
             val waveHeight = (pullOffset * 0.5f).coerceAtMost(80.dp.toPx())
-            val path = Path().apply {
+            wavePath.reset()
+            wavePath.apply {
                 moveTo(0f, 0f)
                 lineTo(0f, waveHeight * 0.6f)
                 cubicTo(
@@ -741,7 +730,7 @@ fun DynamicPullGlowingBackground(
                 close()
             }
             drawPath(
-                path = path,
+                path = wavePath,
                 brush = Brush.horizontalGradient(
                     colors = listOf(
                         secondaryGlow.copy(alpha = 0.25f),
@@ -1783,7 +1772,7 @@ private fun AddProductOrGroupDialog(
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.SemiBold
                 )
-                val categories = listOf("Dairy", "Beverages", "Pantry", "Bakery", "Butchery", "Produce", "Cleaning", "SweetsNuts")
+                val categories = listOf("Dairy", "Beverages", "Pantry", "Bakery", "Butchery", "Produce", "Household", "SweetsNuts")
                 androidx.compose.foundation.lazy.LazyRow(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1883,6 +1872,7 @@ fun ProductGroupCard(
     group: ProductGroup,
     isArabic: Boolean,
     autoExpand: Boolean,
+    searchQuery: String = "",
     onAddGroupToCart: (ProductGroup) -> Unit,
     onAddVariantToCart: (ProductVariant) -> Unit,
     onEditVariantPrice: (ProductVariant) -> Unit,
@@ -2114,7 +2104,25 @@ fun ProductGroupCard(
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    group.variants.forEach { variant ->
+                    val displayedVariants = remember(group.variants, searchQuery) {
+                        val q = searchQuery.trim()
+                        if (q.isEmpty()) {
+                            group.variants
+                        } else {
+                            val matching = group.variants.filter { v ->
+                                v.itemName.contains(q, ignoreCase = true) ||
+                                    v.itemNameAr.contains(q, ignoreCase = true) ||
+                                    v.barcode.contains(q)
+                            }
+                            matching.ifEmpty { group.variants }
+                        }
+                    }
+                    var visibleLimit by remember(group.id, expandedState, searchQuery) { mutableIntStateOf(15) }
+                    val pageVariants = remember(displayedVariants, visibleLimit) {
+                        displayedVariants.take(visibleLimit)
+                    }
+
+                    pageVariants.forEach { variant ->
                         SubVariantItemRow(
                             variant = variant,
                             isArabic = isArabic,
@@ -2122,6 +2130,30 @@ fun ProductGroupCard(
                             onEditPrice = { onEditVariantPrice(variant) }
                         )
                         Spacer(modifier = Modifier.height(6.dp))
+                    }
+
+                    if (displayedVariants.size > visibleLimit) {
+                        val remaining = displayedVariants.size - visibleLimit
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (isLight) CyanTintBg else ElectricCyan.copy(alpha = 0.14f))
+                                .border(
+                                    BorderStroke(1.dp, if (isLight) CyanTintBorder else ElectricCyan.copy(alpha = 0.35f)),
+                                    RoundedCornerShape(10.dp)
+                                )
+                                .clickable { visibleLimit += 20 }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (isArabic) "عرض المزيد ($remaining متبقي)" else "Show more ($remaining remaining)",
+                                color = if (isLight) CyanTintText else ElectricCyan,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
